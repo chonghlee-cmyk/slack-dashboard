@@ -35,6 +35,8 @@ export default function WorkDetailPage() {
   const [memos, setMemos] = useState<{ id: string; language: string | null; content: string; created_at: string }[]>([]);
   const [newMemo, setNewMemo] = useState('');
   const [memoLang, setMemoLang] = useState('');
+  const [memoError, setMemoError] = useState('');
+  const [memoSaving, setMemoSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,23 +68,30 @@ export default function WorkDetailPage() {
     }
 
     // memos
-    const { data: memoData } = await supabase
+    const { data: memoList } = await supabase
       .from('memos')
       .select('*')
       .eq('work_id', id)
       .order('created_at', { ascending: false });
-    setMemos(memoData ?? []);
+    setMemos(memoList ?? []);
 
     setLoading(false);
   }
 
   async function addMemo() {
     if (!newMemo.trim()) return;
-    const { data } = await supabase.from('memos').insert({
+    setMemoSaving(true);
+    setMemoError('');
+    const { data, error } = await supabase.from('memos').insert({
       work_id: id,
       language: memoLang || null,
-      content: newMemo.trim(),
+      memo_content: newMemo.trim(),
     }).select().single();
+    setMemoSaving(false);
+    if (error) {
+      setMemoError(error.message);
+      return;
+    }
     if (data) {
       setMemos(prev => [data, ...prev]);
       setNewMemo('');
@@ -290,11 +299,15 @@ export default function WorkDetailPage() {
                 />
                 <button
                   onClick={addMemo}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  disabled={memoSaving}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
-                  + 추가
+                  {memoSaving ? '저장 중…' : '+ 추가'}
                 </button>
               </div>
+              {memoError && (
+                <p className="text-xs text-red-500 mt-1">오류: {memoError}</p>
+              )}
             </div>
 
             {memos.length === 0 && (
@@ -308,7 +321,7 @@ export default function WorkDetailPage() {
                   </span>
                 )}
                 <div className="flex-1">
-                  <p className="text-sm text-gray-800">{m.content}</p>
+                  <p className="text-sm text-gray-800">{(m as any).memo_content}</p>
                   <p className="text-xs text-gray-400 mt-1">{m.created_at?.slice(0, 10)}</p>
                 </div>
               </div>

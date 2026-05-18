@@ -56,6 +56,7 @@ export interface Memo {
   id: string;
   work_id: string;
   language: string | null;
-  content: string;
+  memo_content: string;
   created_at: string;
+  updated_at: string;
 }
