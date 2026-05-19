@@ -26,18 +26,16 @@ export interface WorkLanguage {
   coin_discount: number | null;
 }
 
-export interface EpisodeRevision {
-  id: string;
-  work_id: string;
-  title_ko: string | null;
-  episode_number: string | null;
+export interface ManuscriptRequest {
+  id: number;
+  work_number: string | null;
   language: string | null;
-  revision_note: string | null;
   status: string | null;
   urgency: string | null;
-  requester: string | null;
+  episode: string | null;
+  manager: string | null;
+  image_url: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export interface SlackMessage {

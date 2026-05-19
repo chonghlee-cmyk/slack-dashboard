@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Work, WorkLanguage, EpisodeRevision, SlackMessage } from '@/lib/types';
+import { Work, WorkLanguage, ManuscriptRequest, SlackMessage } from '@/lib/types';
 
 const LANG_TABS = ['PT', 'EN', 'ES', 'IT', 'DE', 'FR', 'TC', 'JP', 'TH'];
 
@@ -45,7 +45,7 @@ export default function WorkDetailPage() {
 
   const [work, setWork] = useState<Work | null>(null);
   const [languages, setLanguages] = useState<WorkLanguage[]>([]);
-  const [revisions, setRevisions] = useState<EpisodeRevision[]>([]);
+  const [revisions, setRevisions] = useState<ManuscriptRequest[]>([]);
   const [slackMessages, setSlackMessages] = useState<SlackMessage[]>([]);
   const [memos, setMemos] = useState<MemoRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,11 +89,11 @@ export default function WorkDetailPage() {
     const [workRes, langRes, revRes] = await Promise.all([
       supabase.from('works').select('*').eq('work_id', id).single(),
       supabase.from('work_languages').select('*').eq('work_id', id),
-      supabase.from('episode_revisions').select('*').eq('work_id', id).order('created_at', { ascending: false }).limit(50),
+      supabase.from('manuscript_requests').select('*').eq('work_number', id).order('created_at', { ascending: false }).limit(50),
     ]);
     setWork(workRes.data as Work);
     setLanguages((langRes.data as WorkLanguage[]) ?? []);
-    setRevisions((revRes.data as EpisodeRevision[]) ?? []);
+    setRevisions((revRes.data as ManuscriptRequest[]) ?? []);
 
     if (workRes.data?.work_id) {
       const { data: slack } = await supabase
@@ -154,7 +154,7 @@ export default function WorkDetailPage() {
   const activeLang = languages.find(l => l.language === activeTab);
 
   // 즐겨찾기 탭용 필터
-  const favRevisions = revisions.filter(r => isFav('revisions', r.id));
+  const favRevisions = revisions.filter(r => isFav('revisions', String(r.id)));
   const favSlack = slackMessages.filter(m => isFav('slack', String(m.id)));
   const favMemos = memos.filter(m => isFav('memos', m.id));
 
@@ -260,14 +260,19 @@ export default function WorkDetailPage() {
                 <div className="space-y-2">
                   {favRevisions.map(r => (
                     <div key={r.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                      <StarButton active={true} onClick={() => toggleFav('revisions', r.id)} />
+                      <StarButton active={true} onClick={() => toggleFav('revisions', String(r.id))} />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
                           {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
-                          {r.episode_number && <span className="text-xs text-gray-400">{r.episode_number}화</span>}
+                          {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
+                          {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
                         </div>
-                        <p className="text-sm text-gray-800">{r.revision_note ?? '-'}</p>
+                        {r.image_url && (
+                          <a href={r.image_url} target="_blank" rel="noopener noreferrer">
+                            <img src={r.image_url} alt="원고 이미지" className="mt-2 max-h-48 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 transition-opacity cursor-zoom-in" />
+                          </a>
+                        )}
                         <p className="text-xs text-gray-400 mt-1">{r.created_at?.slice(0, 10)}</p>
                       </div>
                     </div>
@@ -326,15 +331,24 @@ export default function WorkDetailPage() {
             {revisions.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">수정사항 없음</div>}
             {revisions.map(r => (
               <div key={r.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                <StarButton active={isFav('revisions', r.id)} onClick={() => toggleFav('revisions', r.id)} />
+                <StarButton active={isFav('revisions', String(r.id))} onClick={() => toggleFav('revisions', String(r.id))} />
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
                     {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
-                    {r.episode_number && <span className="text-xs text-gray-400">{r.episode_number}화</span>}
+                    {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
                     {r.urgency && <span className="text-xs text-red-400 font-medium">{r.urgency}</span>}
+                    {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
                   </div>
-                  <p className="text-sm text-gray-800">{r.revision_note ?? '-'}</p>
+                  {r.image_url && (
+                    <a href={r.image_url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={r.image_url}
+                        alt="원고 이미지"
+                        className="mt-2 max-h-64 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 transition-opacity cursor-zoom-in"
+                      />
+                    </a>
+                  )}
                   <p className="text-xs text-gray-400 mt-2">{r.created_at?.slice(0, 10)}</p>
                 </div>
               </div>
