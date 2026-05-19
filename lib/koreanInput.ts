@@ -40,8 +40,22 @@ function compose(cho: string, jung: string, jong = ''): string {
   return String.fromCharCode(0xAC00 + c * 21 * 28 + v * 28 + f);
 }
 
+/**
+ * 일반 대문자(Caps Lock)는 소문자로 정규화하되,
+ * 쌍자음·이중모음 shift 키(Q W E R T O P)는 원본 유지
+ * 예: "DKQK" → "dkQk" → "아빠"
+ *     "DKqK" → "dkqk" → "아바" (q=ㅂ, Q=ㅃ 구분)
+ */
+function normalizeInput(s: string): string {
+  const SHIFT_KEYS = new Set(['Q','W','E','R','T','O','P']);
+  return s.split('').map(c =>
+    c >= 'A' && c <= 'Z' && !SHIFT_KEYS.has(c) ? c.toLowerCase() : c
+  ).join('');
+}
+
 /** 영문 자판 입력 → 한글 완성형 변환 */
 export function engToKorean(input: string): string {
+  input = normalizeInput(input);
   // 1. 각 문자를 자모로 변환
   const jamos: string[] = [];
   for (const ch of input) {
