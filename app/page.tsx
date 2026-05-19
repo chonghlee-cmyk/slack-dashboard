@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Work } from '@/lib/types';
+import { engToKorean, decomposeKorean, looksLikeEngInput } from '@/lib/koreanInput';
 
 /* ── 상태 배지 ── */
 function StatusBadge({ status }: { status: string | null }) {
@@ -87,8 +88,18 @@ export default function HomePage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
+    // 영문 자판 입력이면 한글로 변환하여 병행 검색
+    const qKr = q && looksLikeEngInput(q) ? engToKorean(q).toLowerCase() : '';
+    const matchText = (target: string | null) => {
+      if (!target) return false;
+      const t = target.toLowerCase();
+      const tDecomp = decomposeKorean(t);
+      if (t.includes(q) || tDecomp.includes(q)) return true;
+      if (qKr && (t.includes(qKr) || tDecomp.includes(qKr))) return true;
+      return false;
+    };
     let list = works.filter(w => {
-      if (q && !w.title_ko?.toLowerCase().includes(q) && !w.title_en?.toLowerCase().includes(q) && !w.work_id?.toLowerCase().includes(q) && !w.writer_ko?.toLowerCase().includes(q)) return false;
+      if (q && !matchText(w.title_ko) && !matchText(w.title_en) && !matchText(w.work_id) && !matchText(w.writer_ko)) return false;
       if (statusFilter && !w.kr_status?.includes(statusFilter)) return false;
       if (platformFilter && w.platform_name !== platformFilter) return false;
       if (genreFilter && w.genre !== genreFilter) return false;
@@ -142,10 +153,9 @@ export default function HomePage() {
             </svg>
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="작품명, 영문명, 작가 검색"
-              className="pl-8 pr-10 py-1.5 w-60 rounded-md border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
+              placeholder="작품명, 영문명, 작가 검색 (한/영 자동변환)"
+              className="pl-8 pr-3 py-1.5 w-64 rounded-md border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
             />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 font-mono border border-gray-200 rounded px-1">⌘K</span>
           </div>
 
           <div className="h-4 w-px bg-gray-200" />
