@@ -107,7 +107,7 @@ export function decomposeKorean(text: string): string {
   return result;
 }
 
-/** 검색어가 영문 자판 입력인지 추정 */
+/** 검색어가 영문 자판 입력인지 추정 (대소문자 원본 기준) */
 export function looksLikeEngInput(s: string): boolean {
-  return /^[a-zA-Z]+$/.test(s) && s.split('').some(c => EN_TO_JAMO[c]);
+  return /^[a-zA-Z]+$/.test(s) && s.split('').some(c => EN_TO_JAMO[c] !== undefined);
 }

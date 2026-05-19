@@ -88,8 +88,8 @@ export default function HomePage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    // 영문 자판 입력이면 한글로 변환하여 병행 검색
-    const qKr = q && looksLikeEngInput(q) ? engToKorean(q).toLowerCase() : '';
+    // 영문 자판 입력이면 원본 케이스 유지한 채 한글 변환 (Q=ㅃ, R=ㄲ 등 대문자 쌍자음 보존)
+    const qKr = search && looksLikeEngInput(search) ? engToKorean(search).toLowerCase() : '';
     const matchText = (target: string | null) => {
       if (!target) return false;
       const t = target.toLowerCase();
