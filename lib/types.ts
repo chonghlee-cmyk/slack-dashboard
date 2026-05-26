@@ -40,14 +40,26 @@ export interface ManuscriptRequest {
 
 export interface SlackMessage {
   id: number;
-  artwork_name: string;
-  channel_name: string | null;
+  artwork_name?: string;
+  title_number?: string | null;
+  title_name?: string | null;
+  channel_name?: string | null;
+  channel?: string | null;
   sender: string | null;
-  date: string | null;
-  time: string | null;
-  content: string | null;
-  permalink: string;
-  synced_at: string;
+  date?: string | null;
+  time?: string | null;
+  created_at?: string | null;
+  content?: string | null;
+  message?: string | null;
+  permalink?: string;
+  slack_permalink?: string;
+  is_reply?: boolean | null;
+  parent_message?: string | null;
+  parent_link?: string | null;
+  category?: string | null;
+  sub_category?: string | null;
+  image_urls?: string[] | null;
+  synced_at?: string;
 }
 
 export interface Memo {

@@ -7,6 +7,49 @@ import { Work, WorkLanguage, ManuscriptRequest, SlackMessage } from '@/lib/types
 
 const LANG_TABS = ['PT', 'EN', 'ES', 'IT', 'DE', 'FR', 'TC', 'JP', 'TH'];
 
+// 카테고리별 색상 매핑 (Slack 메시지 그룹 헤더용)
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  '원고/PSD': { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
+  '일정/스케줄': { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+  '메타/작가': { bg: 'bg-pink-50', text: 'text-pink-700', dot: 'bg-pink-500' },
+  '라이센스/계약': { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  '현지화/번역': { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  'BM/타입변경': { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  '런칭/오픈': { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
+  '기타': { bg: 'bg-gray-50', text: 'text-gray-700', dot: 'bg-gray-400' },
+  '분류 없음': { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-300' },
+};
+
+// 발신자 이니셜 + 색상 (아바타 대용)
+function senderColor(name: string): string {
+  const colors = ['bg-rose-400','bg-orange-400','bg-amber-400','bg-emerald-400','bg-teal-400','bg-blue-400','bg-indigo-400','bg-purple-400','bg-pink-400'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) % colors.length;
+  return colors[Math.abs(hash)];
+}
+function senderInitial(name: string): string {
+  return (name || '?').trim().charAt(0).toUpperCase();
+}
+
+// SlackMessage에서 필드를 안전하게 가져오기 (sync 스키마 차이 대응)
+function msgPermalink(m: SlackMessage): string {
+  return m.slack_permalink ?? m.permalink ?? '';
+}
+function msgContent(m: SlackMessage): string {
+  return m.message ?? m.content ?? '';
+}
+function msgChannel(m: SlackMessage): string {
+  return m.channel ?? m.channel_name ?? '';
+}
+function msgDate(m: SlackMessage): string {
+  if (m.created_at) return m.created_at.slice(0, 10);
+  return m.date ?? '';
+}
+function msgTime(m: SlackMessage): string {
+  if (m.created_at) return m.created_at.slice(11, 16);
+  return (m.time ?? '').slice(0, 5);
+}
+
 const statusColor = (status: string | null) => {
   if (!status) return 'bg-gray-100 text-gray-500';
   if (status.includes('연재') || status.toLowerCase().includes('ongoing')) return 'bg-indigo-100 text-indigo-600';
@@ -42,6 +85,9 @@ export default function WorkDetailPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('PT');
   const [activeSection, setActiveSection] = useState<Section>('revisions');
+  const [slackOrder, setSlackOrder] = useState<'category' | 'time'>('category');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
   const [work, setWork] = useState<Work | null>(null);
   const [languages, setLanguages] = useState<WorkLanguage[]>([]);
@@ -96,10 +142,12 @@ export default function WorkDetailPage() {
     setRevisions((revRes.data as ManuscriptRequest[]) ?? []);
 
     if (workRes.data?.work_id) {
+      // title_number 또는 artwork_name 둘 다 시도 (스키마 호환)
       const { data: slack } = await supabase
         .from('slack_messages').select('*')
-        .eq('artwork_name', workRes.data.work_id)
-        .order('date', { ascending: false }).order('time', { ascending: false }).limit(100);
+        .or(`title_number.eq.${workRes.data.work_id},artwork_name.eq.${workRes.data.work_id}`)
+        .order('created_at', { ascending: false })
+        .limit(200);
       setSlackMessages((slack as SlackMessage[]) ?? []);
     }
 
@@ -357,27 +405,165 @@ export default function WorkDetailPage() {
         )}
 
         {/* 💬 Slack 메시지 */}
-        {activeSection === 'slack' && (
-          <div className="space-y-2">
-            {slackMessages.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">Slack 메시지 없음</div>}
-            {slackMessages.map(m => (
-              <div key={m.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                <StarButton active={isFav('slack', String(m.id))} onClick={() => toggleFav('slack', String(m.id))} />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-indigo-600">{m.sender ?? '-'}</span>
-                      <span className="text-xs text-gray-400">{m.channel_name}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">{m.date} {m.time}</span>
+        {activeSection === 'slack' && (() => {
+          // 스레드 그룹: 부모 메시지 + 그 답글들
+          const parents = slackMessages.filter(m => !m.is_reply);
+          const repliesByParent = new Map<string, SlackMessage[]>();
+          for (const m of slackMessages) {
+            if (m.is_reply && m.parent_link) {
+              if (!repliesByParent.has(m.parent_link)) repliesByParent.set(m.parent_link, []);
+              repliesByParent.get(m.parent_link)!.push(m);
+            }
+          }
+          // 부모 없이 답글만 있는 경우도 표시
+          const orphanReplies = slackMessages.filter(m =>
+            m.is_reply && (!m.parent_link || !parents.some(p => msgPermalink(p) === m.parent_link))
+          );
+
+          // 카테고리별 그룹핑
+          const byCategory = new Map<string, SlackMessage[]>();
+          for (const p of [...parents, ...orphanReplies]) {
+            const cat = p.category || '분류 없음';
+            if (!byCategory.has(cat)) byCategory.set(cat, []);
+            byCategory.get(cat)!.push(p);
+          }
+          const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
+          const sortedCategories = [...byCategory.keys()].sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
+
+          const renderMessage = (m: SlackMessage, isReply = false) => {
+            const sender = m.sender ?? '?';
+            const replies = repliesByParent.get(msgPermalink(m)) ?? [];
+            const threadOpen = expandedThreads.has(String(m.id));
+            return (
+              <div key={m.id} className={`${isReply ? 'pl-6 mt-3 border-l-2 border-gray-100 ml-5' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold ${senderColor(sender)}`}>
+                    {senderInitial(sender)}
                   </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{m.content}</p>
-                  {m.permalink && <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Slack에서 보기 →</a>}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="text-sm font-semibold text-gray-900">{sender}</span>
+                      <span className="text-xs text-gray-400">{msgDate(m)} {msgTime(m)}</span>
+                      {!isReply && (
+                        <StarButton active={isFav('slack', String(m.id))} onClick={() => toggleFav('slack', String(m.id))} />
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{msgContent(m)}</p>
+                    {m.image_urls && m.image_urls.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {m.image_urls.slice(0, 3).map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt="" className="h-20 rounded-lg border border-gray-100 object-cover hover:opacity-90" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {!isReply && replies.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setExpandedThreads(prev => {
+                            const next = new Set(prev);
+                            if (next.has(String(m.id))) next.delete(String(m.id));
+                            else next.add(String(m.id));
+                            return next;
+                          });
+                        }}
+                        className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                      >
+                        <span>↳ {replies.length} replies</span>
+                        <span className="text-gray-400">{threadOpen ? '· Hide thread' : '· View thread'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!isReply && threadOpen && replies.map(r => renderMessage(r, true))}
+              </div>
+            );
+          };
+
+          if (slackMessages.length === 0) {
+            return <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">Slack 메시지 없음</div>;
+          }
+
+          return (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              {/* 헤더: Slack 로고 + 정렬 토글 */}
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-semibold text-gray-900">💬 Slack Messages</span>
+                  <span className="text-xs text-gray-400">({slackMessages.length})</span>
+                </div>
+                <div className="flex bg-gray-50 rounded-lg p-0.5">
+                  <button onClick={() => setSlackOrder('category')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${slackOrder === 'category' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Category
+                  </button>
+                  <button onClick={() => setSlackOrder('time')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${slackOrder === 'time' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Time
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              {/* 카테고리별 그룹 보기 */}
+              {slackOrder === 'category' && (
+                <div className="divide-y divide-gray-100">
+                  {sortedCategories.map(cat => {
+                    const list = byCategory.get(cat)!;
+                    const color = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS['분류 없음'];
+                    const isOpen = expandedCategories.has(cat);
+                    const latestDate = list[0] ? msgDate(list[0]) : '';
+                    return (
+                      <div key={cat}>
+                        <button
+                          onClick={() => {
+                            setExpandedCategories(prev => {
+                              const next = new Set(prev);
+                              if (next.has(cat)) next.delete(cat);
+                              else next.add(cat);
+                              return next;
+                            });
+                          }}
+                          className={`w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`text-gray-400 text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                            <span className={`w-2 h-2 rounded-full ${color.dot}`} />
+                            <span className={`text-sm font-semibold ${color.text}`}>{cat}</span>
+                            <span className="text-xs text-gray-400">({list.length})</span>
+                          </div>
+                          <span className="text-xs text-gray-400">{latestDate}</span>
+                        </button>
+                        {isOpen && (
+                          <div className={`${color.bg} px-5 py-4 space-y-5`}>
+                            {list.map(m => renderMessage(m))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 시간순 보기 */}
+              {slackOrder === 'time' && (
+                <div className="px-5 py-4 space-y-5">
+                  {[...parents, ...orphanReplies]
+                    .sort((a, b) => (msgDate(b) + msgTime(b)).localeCompare(msgDate(a) + msgTime(a)))
+                    .map(m => renderMessage(m))}
+                </div>
+              )}
+
+              {/* 하단 Slack 링크 */}
+              <div className="px-5 py-3 border-t border-gray-100 text-center">
+                <a href="https://slack.com" target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1">
+                  📋 View on Slack ↗
+                </a>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 📝 언어권별 메모 */}
         {activeSection === 'memos' && (
