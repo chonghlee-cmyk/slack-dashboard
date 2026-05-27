@@ -49,6 +49,14 @@ function msgTime(m: SlackMessage): string {
   if (m.created_at) return m.created_at.slice(11, 16);
   return (m.time ?? '').slice(0, 5);
 }
+function msgImages(m: SlackMessage): string[] {
+  if (!m.image_urls) return [];
+  if (Array.isArray(m.image_urls)) return m.image_urls.filter(u => typeof u === 'string' && u.length > 0);
+  try {
+    const parsed = JSON.parse(m.image_urls as unknown as string);
+    return Array.isArray(parsed) ? parsed.filter((u: any) => typeof u === 'string' && u.length > 0) : [];
+  } catch { return []; }
+}
 
 const statusColor = (status: string | null) => {
   if (!status) return 'bg-gray-100 text-gray-500';
@@ -88,6 +96,8 @@ export default function WorkDetailPage() {
   const [slackOrder, setSlackOrder] = useState<'category' | 'time'>('category');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());  // 클릭해서 펼친 이미지 (egress 절약)
+  const [modalImage, setModalImage] = useState<string | null>(null);              // 확대 보기 모달
 
   const [work, setWork] = useState<Work | null>(null);
   const [languages, setLanguages] = useState<WorkLanguage[]>([]);
@@ -142,10 +152,9 @@ export default function WorkDetailPage() {
     setRevisions((revRes.data as ManuscriptRequest[]) ?? []);
 
     if (workRes.data?.work_id) {
-      // title_number 또는 artwork_name 둘 다 시도 (스키마 호환)
       const { data: slack } = await supabase
         .from('slack_messages').select('*')
-        .or(`title_number.eq.${workRes.data.work_id},artwork_name.eq.${workRes.data.work_id}`)
+        .eq('title_number', workRes.data.work_id)
         .order('created_at', { ascending: false })
         .limit(200);
       setSlackMessages((slack as SlackMessage[]) ?? []);
@@ -449,15 +458,42 @@ export default function WorkDetailPage() {
                       )}
                     </div>
                     <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{msgContent(m)}</p>
-                    {m.image_urls && m.image_urls.length > 0 && (
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        {m.image_urls.slice(0, 3).map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                            <img src={url} alt="" className="h-20 rounded-lg border border-gray-100 object-cover hover:opacity-90" />
-                          </a>
-                        ))}
-                      </div>
-                    )}
+                    {(() => {
+                      const images = msgImages(m);
+                      if (images.length === 0) return null;
+                      const key = String(m.id);
+                      const isExpanded = expandedImages.has(key);
+                      if (!isExpanded) {
+                        return (
+                          <button
+                            onClick={() => setExpandedImages(prev => new Set(prev).add(key))}
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors"
+                          >
+                            📷 이미지 {images.length}장 — 클릭하여 보기
+                          </button>
+                        );
+                      }
+                      return (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {images.map((url, i) => (
+                            <button key={i} onClick={() => setModalImage(url)} className="block">
+                              <img
+                                src={url}
+                                alt=""
+                                loading="lazy"
+                                className="h-20 rounded-lg border border-gray-100 object-cover hover:opacity-90 cursor-zoom-in"
+                              />
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setExpandedImages(prev => { const next = new Set(prev); next.delete(key); return next; })}
+                            className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+                          >
+                            접기
+                          </button>
+                        </div>
+                      );
+                    })()}
                     {!isReply && replies.length > 0 && (
                       <button
                         onClick={() => {
@@ -630,6 +666,23 @@ export default function WorkDetailPage() {
           </div>
         )}
       </div>
+
+      {/* 이미지 확대 모달 */}
+      {modalImage && (
+        <div
+          onClick={() => setModalImage(null)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          <img src={modalImage} alt="" className="max-w-full max-h-full rounded-lg" />
+          <button
+            onClick={() => setModalImage(null)}
+            className="absolute top-4 right-4 text-white text-3xl hover:opacity-75"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
