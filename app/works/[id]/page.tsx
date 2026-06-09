@@ -4,8 +4,33 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Work, WorkLanguage, ManuscriptRequest, SlackMessage } from '@/lib/types';
+import { engToKorean, looksLikeEngInput } from '@/lib/koreanInput';
 
 const LANG_TABS = ['PT', 'EN', 'ES', 'IT', 'DE', 'FR', 'TC', 'JP', 'TH'];
+
+// 정규식 특수문자 이스케이프 (검색어/작품명에 들어갈 수 있음)
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+type HighlightTerm = { term: string; className: string };
+
+// 메시지 텍스트에서 지정한 단어들을 <mark>로 강조해 React 노드 배열로 반환
+function highlightText(text: string, terms: HighlightTerm[]): React.ReactNode {
+  const valid = terms.filter(t => t.term && t.term.trim());
+  if (valid.length === 0 || !text) return text;
+  // 긴 단어 우선 매칭 (작품명이 검색어보다 먼저 잡히도록)
+  const ordered = [...valid].sort((a, b) => b.term.length - a.term.length);
+  const re = new RegExp(`(${ordered.map(t => escapeRegExp(t.term)).join('|')})`, 'gi');
+  const parts = text.split(re);
+  return parts.map((part, i) => {
+    if (!part) return null;
+    const hit = ordered.find(t => t.term.toLowerCase() === part.toLowerCase());
+    return hit
+      ? <mark key={i} className={`rounded px-0.5 ${hit.className}`}>{part}</mark>
+      : <span key={i}>{part}</span>;
+  });
+}
 
 // 카테고리별 색상 매핑 (Slack 메시지 그룹 헤더용)
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -94,6 +119,7 @@ export default function WorkDetailPage() {
   const [activeTab, setActiveTab] = useState('PT');
   const [activeSection, setActiveSection] = useState<Section>('revisions');
   const [slackOrder, setSlackOrder] = useState<'category' | 'time'>('category');
+  const [slackQuery, setSlackQuery] = useState('');  // Slack 메시지 검색어
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());  // 클릭해서 펼친 이미지 (egress 절약)
@@ -415,17 +441,40 @@ export default function WorkDetailPage() {
 
         {/* 💬 Slack 메시지 */}
         {activeSection === 'slack' && (() => {
+          // 검색어 처리 — 영문자판으로 입력한 한글도 변환해서 함께 매칭
+          const rawQuery = slackQuery.trim();
+          const queryActive = rawQuery.length > 0;
+          const queryVariants = queryActive
+            ? Array.from(new Set([
+                rawQuery.toLowerCase(),
+                ...(looksLikeEngInput(rawQuery) ? [engToKorean(rawQuery).toLowerCase()] : []),
+              ]))
+            : [];
+          const matchesQuery = (m: SlackMessage) => {
+            if (!queryActive) return true;
+            const hay = `${msgContent(m)} ${m.sender ?? ''} ${m.category ?? ''}`.toLowerCase();
+            return queryVariants.some(q => hay.includes(q));
+          };
+          const visibleSlack = queryActive ? slackMessages.filter(matchesQuery) : slackMessages;
+
+          // 강조 단어: 작품명 + 작품번호 (항상) + 검색어 (검색 중일 때)
+          const highlightTerms: HighlightTerm[] = [
+            { term: work.title_ko ?? '', className: 'bg-indigo-100 text-indigo-800' },
+            { term: work.work_id ?? '', className: 'bg-emerald-100 text-emerald-800' },
+            ...queryVariants.map(q => ({ term: q, className: 'bg-yellow-200 text-yellow-900' })),
+          ];
+
           // 스레드 그룹: 부모 메시지 + 그 답글들
-          const parents = slackMessages.filter(m => !m.is_reply);
+          const parents = visibleSlack.filter(m => !m.is_reply);
           const repliesByParent = new Map<string, SlackMessage[]>();
-          for (const m of slackMessages) {
+          for (const m of visibleSlack) {
             if (m.is_reply && m.parent_link) {
               if (!repliesByParent.has(m.parent_link)) repliesByParent.set(m.parent_link, []);
               repliesByParent.get(m.parent_link)!.push(m);
             }
           }
           // 부모 없이 답글만 있는 경우도 표시
-          const orphanReplies = slackMessages.filter(m =>
+          const orphanReplies = visibleSlack.filter(m =>
             m.is_reply && (!m.parent_link || !parents.some(p => msgPermalink(p) === m.parent_link))
           );
 
@@ -457,7 +506,7 @@ export default function WorkDetailPage() {
                         <StarButton active={isFav('slack', String(m.id))} onClick={() => toggleFav('slack', String(m.id))} />
                       )}
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{msgContent(m)}</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{highlightText(msgContent(m), highlightTerms)}</p>
                     {(() => {
                       const images = msgImages(m);
                       if (images.length === 0) return null;
@@ -527,7 +576,9 @@ export default function WorkDetailPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-semibold text-gray-900">💬 Slack Messages</span>
-                  <span className="text-xs text-gray-400">({slackMessages.length})</span>
+                  <span className="text-xs text-gray-400">
+                    {queryActive ? `(${visibleSlack.length}/${slackMessages.length})` : `(${slackMessages.length})`}
+                  </span>
                 </div>
                 <div className="flex bg-gray-50 rounded-lg p-0.5">
                   <button onClick={() => setSlackOrder('category')}
@@ -541,13 +592,51 @@ export default function WorkDetailPage() {
                 </div>
               </div>
 
+              {/* 검색창 */}
+              <div className="px-5 py-3 border-b border-gray-100">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                  <input
+                    type="text"
+                    value={slackQuery}
+                    onChange={e => setSlackQuery(e.target.value)}
+                    placeholder="메시지 내용·발신자·카테고리 검색..."
+                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                  {queryActive && (
+                    <button
+                      onClick={() => setSlackQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none"
+                      aria-label="검색어 지우기"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {queryActive && (
+                  <p className="text-xs text-gray-400 mt-1.5 px-0.5">
+                    {visibleSlack.length > 0
+                      ? `“${rawQuery}” — ${visibleSlack.length}개 메시지 일치`
+                      : `“${rawQuery}” — 일치하는 메시지 없음`}
+                  </p>
+                )}
+              </div>
+
+              {/* 검색 결과 없음 */}
+              {queryActive && visibleSlack.length === 0 && (
+                <div className="px-5 py-10 text-center text-sm text-gray-400">
+                  검색 결과가 없습니다.
+                </div>
+              )}
+
               {/* 카테고리별 그룹 보기 */}
               {slackOrder === 'category' && (
                 <div className="divide-y divide-gray-100">
                   {sortedCategories.map(cat => {
                     const list = byCategory.get(cat)!;
                     const color = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS['분류 없음'];
-                    const isOpen = expandedCategories.has(cat);
+                    // 검색 중에는 일치하는 메시지가 보이도록 카테고리를 자동으로 펼침
+                    const isOpen = queryActive || expandedCategories.has(cat);
                     const latestDate = list[0] ? msgDate(list[0]) : '';
                     return (
                       <div key={cat}>
