@@ -455,7 +455,13 @@ export default function WorkDetailPage() {
             const hay = `${msgContent(m)} ${m.sender ?? ''} ${m.category ?? ''}`.toLowerCase();
             return queryVariants.some(q => hay.includes(q));
           };
-          const visibleSlack = queryActive ? slackMessages.filter(matchesQuery) : slackMessages;
+          let visibleSlack = queryActive ? slackMessages.filter(matchesQuery) : slackMessages;
+          // 시간순 정렬 (오래된 것부터) — 부모/답글 분리 전에 수행
+          visibleSlack = visibleSlack.slice().sort((a, b) => {
+            const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return aTime - bTime;
+          });
 
           // 강조 단어: 작품명 + 작품번호 (항상) + 검색어 (검색 중일 때)
           const highlightTerms: HighlightTerm[] = [
@@ -478,20 +484,12 @@ export default function WorkDetailPage() {
             m.is_reply && (!m.parent_link || !parents.some(p => msgPermalink(p) === m.parent_link))
           );
 
-          // 카테고리별 그룹핑
+          // 카테고리별 그룹핑 (이미 시간순으로 정렬된 visibleSlack 유지)
           const byCategory = new Map<string, SlackMessage[]>();
           for (const p of [...parents, ...orphanReplies]) {
             const cat = p.category || '분류 없음';
             if (!byCategory.has(cat)) byCategory.set(cat, []);
             byCategory.get(cat)!.push(p);
-          }
-          // 각 카테고리 내 메시지를 시간순으로 정렬 (오래된 것부터)
-          for (const list of byCategory.values()) {
-            list.sort((a, b) => {
-              const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-              const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-              return aTime - bTime;
-            });
           }
           const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
           const sortedCategories = [...byCategory.keys()].sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
@@ -681,13 +679,7 @@ export default function WorkDetailPage() {
               {/* 시간순 보기 */}
               {slackOrder === 'time' && (
                 <div className="px-5 py-4 space-y-5">
-                  {[...parents, ...orphanReplies]
-                    .sort((a, b) => {
-                      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-                      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-                      return aTime - bTime;
-                    })
-                    .map(m => renderMessage(m))}
+                  {[...parents, ...orphanReplies].map(m => renderMessage(m))}
                 </div>
               )}
 
