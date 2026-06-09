@@ -485,12 +485,12 @@ export default function WorkDetailPage() {
             if (!byCategory.has(cat)) byCategory.set(cat, []);
             byCategory.get(cat)!.push(p);
           }
-          // 각 카테고리 내 메시지를 최신순으로 정렬
+          // 각 카테고리 내 메시지를 시간순으로 정렬 (오래된 것부터)
           for (const list of byCategory.values()) {
             list.sort((a, b) => {
               const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
               const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-              return bTime - aTime;
+              return aTime - bTime;
             });
           }
           const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
@@ -685,7 +685,7 @@ export default function WorkDetailPage() {
                     .sort((a, b) => {
                       const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
                       const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-                      return bTime - aTime;
+                      return aTime - bTime;
                     })
                     .map(m => renderMessage(m))}
                 </div>
