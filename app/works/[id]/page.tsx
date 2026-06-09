@@ -485,6 +485,14 @@ export default function WorkDetailPage() {
             if (!byCategory.has(cat)) byCategory.set(cat, []);
             byCategory.get(cat)!.push(p);
           }
+          // 각 카테고리 내 메시지를 최신순으로 정렬
+          for (const list of byCategory.values()) {
+            list.sort((a, b) => {
+              const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return bTime - aTime;
+            });
+          }
           const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
           const sortedCategories = [...byCategory.keys()].sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
 
@@ -674,7 +682,11 @@ export default function WorkDetailPage() {
               {slackOrder === 'time' && (
                 <div className="px-5 py-4 space-y-5">
                   {[...parents, ...orphanReplies]
-                    .sort((a, b) => (msgDate(b) + msgTime(b)).localeCompare(msgDate(a) + msgTime(a)))
+                    .sort((a, b) => {
+                      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+                      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+                      return bTime - aTime;
+                    })
                     .map(m => renderMessage(m))}
                 </div>
               )}
