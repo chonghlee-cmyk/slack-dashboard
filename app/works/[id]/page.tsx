@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Work, WorkLanguage, ManuscriptRequest, SlackMessage } from '@/lib/types';
+import { Work, WorkLanguage, ManuscriptRequest, SlackMessage, SeriesRow, RowMap, LANG_MAP } from '@/lib/types';
 import { engToKorean, looksLikeEngInput } from '@/lib/koreanInput';
 
 const LANG_TABS = ['PT', 'EN', 'ES', 'IT', 'DE', 'FR', 'TC', 'JP', 'TH'];
@@ -113,6 +113,43 @@ function StarButton({ active, onClick }: { active: boolean; onClick: () => void 
   );
 }
 
+// 메모가 있으면 클릭 가능한 작은 점. 클릭하면 메모 내용 팝오버 표시.
+function MemoButton({ memo, align = 'left' }: { memo: string | null | undefined; align?: 'left' | 'right' }) {
+  const [open, setOpen] = useState(false);
+  if (!memo || !memo.trim()) return null;
+  return (
+    <span className="relative inline-block leading-none">
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+        className={`ml-1 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full align-middle transition-colors ${open ? 'bg-amber-500 ring-2 ring-amber-200' : 'bg-amber-400 hover:bg-amber-500'}`}
+        aria-label="메모 보기"
+      >
+        <span className="w-1 h-1 bg-white rounded-full" />
+      </button>
+      {open && (
+        <>
+          {/* 바깥 클릭 시 닫기 */}
+          <span onClick={e => { e.stopPropagation(); setOpen(false); }} className="fixed inset-0 z-20" />
+          <span className={`absolute z-30 top-full mt-1.5 block w-60 bg-white border border-amber-200 rounded-lg shadow-lg p-3 text-xs font-normal text-gray-700 whitespace-pre-wrap text-left ${align === 'right' ? 'right-0' : 'left-0'}`}>
+            {memo}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+// 라벨/값 + (있으면) 클릭형 메모 버튼을 보여주는 정보 셀.
+function InfoCell({ label, value, memo }: { label: string; value: React.ReactNode; memo?: string | null }) {
+  return (
+    <div className="relative">
+      <div className="text-xs text-gray-400 mb-1 flex items-center">{label}<MemoButton memo={memo} /></div>
+      <div className="text-sm font-semibold text-gray-800">{value}</div>
+    </div>
+  );
+}
+
 export default function WorkDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -127,6 +164,8 @@ export default function WorkDetailPage() {
 
   const [work, setWork] = useState<Work | null>(null);
   const [languages, setLanguages] = useState<WorkLanguage[]>([]);
+  const [seriesMemo, setSeriesMemo] = useState<RowMap | null>(null);   // 작품 마스터 셀 메모 (series_memo)
+  const [langMemo, setLangMemo] = useState<RowMap | null>(null);       // 언어별 셀 메모 (language_memo)
   const [revisions, setRevisions] = useState<ManuscriptRequest[]>([]);
   const [slackMessages, setSlackMessages] = useState<SlackMessage[]>([]);
   const [memos, setMemos] = useState<MemoRow[]>([]);
@@ -168,19 +207,56 @@ export default function WorkDetailPage() {
 
   async function loadAll() {
     setLoading(true);
-    const [workRes, langRes, revRes] = await Promise.all([
-      supabase.from('works').select('*').eq('work_id', id).single(),
-      supabase.from('work_languages').select('*').eq('work_id', id),
+    // 새 가로형 테이블들: 작품당 1행 (language_status 는 PK가 '작품번호')
+    const [seriesRes, langDataRes, statusRes, sMemoRes, lMemoRes, revRes] = await Promise.all([
+      supabase.from('series_data').select('*').eq('id', id).maybeSingle(),
+      supabase.from('language_data').select('*').eq('id', id).maybeSingle(),
+      supabase.from('language_status').select('*').eq('작품번호', id).maybeSingle(),
+      supabase.from('series_memo').select('*').eq('id', id).maybeSingle(),
+      supabase.from('language_memo').select('*').eq('id', id).maybeSingle(),
       supabase.from('manuscript_requests').select('*').eq('work_number', id).order('created_at', { ascending: false }).limit(50),
     ]);
-    setWork(workRes.data as Work);
-    setLanguages((langRes.data as WorkLanguage[]) ?? []);
+
+    // series_data → Work 뷰모델 정규화
+    const s = seriesRes.data as SeriesRow | null;
+    setWork(s ? {
+      work_id: s.id,
+      title_ko: s.title_ko,
+      title_en: s.title_en,
+      platform_name: s.platform,
+      genre: s.genre,
+      kr_status: s.kr_status,
+      total_episodes: s.total_episodes,
+      free_episodes: s.free_episodes,
+      open_episodes: s.open_episodes,
+      is_adult: s.maturity === '성인',
+      maturity: s.maturity,
+      scope: s.scope,
+      publisher: s.publisher,
+      writer_ko: s.writer,
+      artist_ko: s.artist,
+    } : null);
+
+    // language_data + language_status → 언어별 뷰모델 (앱 탭 9개로 펼침)
+    const ld = (langDataRes.data ?? {}) as RowMap;
+    const stt = (statusRes.data ?? {}) as RowMap;
+    setLanguages(LANG_MAP.map(({ tab, data, status }) => ({
+      language: tab,
+      serial_status: stt[`${status}_status`] ?? null,
+      contract_type: ld[`${data}_contract`] ?? null,
+      store: ld[`${data}_store`] ?? null,
+      coin_regular: ld[`${data}_coin`] ?? null,
+      coin_discount: ld[`${data}_coin_sale`] ?? null,
+    })));
+
+    setSeriesMemo((sMemoRes.data ?? null) as RowMap | null);
+    setLangMemo((lMemoRes.data ?? null) as RowMap | null);
     setRevisions((revRes.data as ManuscriptRequest[]) ?? []);
 
-    if (workRes.data?.work_id) {
+    if (s?.id) {
       const { data: slack } = await supabase
         .from('slack_messages').select('*')
-        .eq('title_number', workRes.data.work_id)
+        .eq('title_number', s.id)
         .order('created_at', { ascending: false })
         .limit(200);
       setSlackMessages((slack as SlackMessage[]) ?? []);
@@ -235,6 +311,7 @@ export default function WorkDetailPage() {
   );
 
   const activeLang = languages.find(l => l.language === activeTab);
+  const activeData = LANG_MAP.find(m => m.tab === activeTab)?.data ?? '';  // language_memo 컬럼 prefix
 
   // 즐겨찾기 탭용 필터
   const favRevisions = revisions.filter(r => isFav('revisions', String(r.id)));
@@ -259,29 +336,34 @@ export default function WorkDetailPage() {
         {/* 작품 제목 */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{work.title_ko}</h2>
-            {work.title_en && <p className="text-sm text-gray-400 mt-1">{work.title_en}</p>}
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+              {work.title_ko}<MemoButton memo={seriesMemo?.title_ko_memo} />
+            </h2>
+            {work.title_en && (
+              <p className="text-sm text-gray-400 mt-1 flex items-center">
+                {work.title_en}<MemoButton memo={seriesMemo?.title_en_memo} />
+              </p>
+            )}
           </div>
           <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColor(work.kr_status)}`}>
             {work.kr_status ?? '-'}
           </span>
         </div>
 
-        {/* 기본 정보 */}
+        {/* 기본 정보 (셀 hover 시 series_memo 표시) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
-            { label: '작품번호', value: work.work_id },
-            { label: '플랫폼', value: work.platform_name },
-            { label: '장르', value: work.genre },
-            { label: '총회차수', value: work.total_episodes ? `${work.total_episodes}화` : '-' },
-            { label: '출판사', value: work.publisher },
-            { label: '성인여부', value: work.is_adult ? '성인' : '비성인' },
-            { label: '무료회차', value: work.free_episodes ? `${work.free_episodes}화` : '-' },
-            { label: '오픈회차', value: work.open_episodes ? `${work.open_episodes}화` : '-' },
+            { label: '작품번호', value: work.work_id, memoKey: 'work_no_memo' },
+            { label: '플랫폼', value: work.platform_name ?? '-', memoKey: 'platform_memo' },
+            { label: '장르', value: work.genre ?? '-', memoKey: 'genre_memo' },
+            { label: '총회차수', value: work.total_episodes ?? '-', memoKey: 'total_episodes_memo' },
+            { label: '출판사', value: work.publisher ?? '-', memoKey: 'publisher_memo' },
+            { label: '성인여부', value: work.is_adult ? '성인' : '비성인', memoKey: 'maturity_memo' },
+            { label: '무료회차', value: work.free_episodes ? `${work.free_episodes}화` : '-', memoKey: 'free_episodes_memo' },
+            { label: '오픈회차', value: work.open_episodes ? `${work.open_episodes}화` : '-', memoKey: 'open_episodes_memo' },
           ].map(item => (
             <div key={item.label} className="bg-white rounded-xl px-4 py-3 shadow-sm">
-              <div className="text-xs text-gray-400 mb-1">{item.label}</div>
-              <div className="text-sm font-medium text-gray-800">{item.value ?? '-'}</div>
+              <InfoCell label={item.label} value={item.value} memo={seriesMemo?.[item.memoKey]} />
             </div>
           ))}
         </div>
@@ -290,7 +372,8 @@ export default function WorkDetailPage() {
         <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
           <div className="flex border-b border-gray-100 overflow-x-auto">
             {LANG_TABS.map(lang => {
-              const hasData = languages.some(l => l.language === lang);
+              const lobj = languages.find(l => l.language === lang);
+              const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
               return (
                 <button key={lang} onClick={() => setActiveTab(lang)}
                   className={`px-4 py-3 text-sm font-medium shrink-0 border-b-2 transition-colors ${activeTab === lang ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'} ${!hasData ? 'opacity-40' : ''}`}>
@@ -301,18 +384,18 @@ export default function WorkDetailPage() {
           </div>
           {activeLang ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4">
-              {[
-                { label: '연재상태', value: activeLang.serial_status },
-                { label: '연재일정', value: activeLang.schedule },
-                { label: '계약구분', value: activeLang.contract_type },
-                { label: '일반코인', value: activeLang.coin_regular ? `${activeLang.coin_regular}코인` : '-' },
-                { label: '할인코인', value: activeLang.coin_discount ? `${activeLang.coin_discount}코인` : '-' },
-              ].map(item => (
-                <div key={item.label}>
-                  <div className="text-xs text-gray-400 mb-1">{item.label}</div>
-                  <div className="text-sm font-semibold text-gray-800">{item.value ?? '-'}</div>
-                </div>
-              ))}
+              {/* 연재상태 — language_status (뱃지, 셀 메모 없음) */}
+              <div>
+                <div className="text-xs text-gray-400 mb-1">연재상태</div>
+                <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(activeLang.serial_status)}`}>
+                  {activeLang.serial_status ?? '-'}
+                </span>
+              </div>
+              {/* 나머지 — language_data + language_memo (셀 hover) */}
+              <InfoCell label="계약구분" value={activeLang.contract_type ?? '-'} memo={langMemo?.[`${activeData}_contract_memo`]} />
+              <InfoCell label="스토어" value={activeLang.store ?? '-'} memo={langMemo?.[`${activeData}_store_memo`]} />
+              <InfoCell label="일반코인" value={activeLang.coin_regular ?? '-'} memo={langMemo?.[`${activeData}_coin_memo`]} />
+              <InfoCell label="할인코인" value={activeLang.coin_discount ?? '-'} memo={langMemo?.[`${activeData}_coin_sale_memo`]} />
             </div>
           ) : (
             <div className="p-6 text-center text-sm text-gray-400">해당 언어권 데이터 없음</div>

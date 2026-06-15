@@ -3,11 +3,26 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Work } from '@/lib/types';
+import { Work, LIST_LANGS, LANG_STATUS_FILTERS } from '@/lib/types';
 import { engToKorean, decomposeKorean, looksLikeEngInput } from '@/lib/koreanInput';
 
-/* ── 상태 배지 ── */
-function StatusBadge({ status }: { status: string | null }) {
+const PAGE_SIZES = [20, 50, 100];
+
+/* ── 언어권 상태 → 색상 ── */
+function langStatusStyle(s: string | null | undefined): string {
+  if (!s || s === '-') return 'bg-gray-50 text-gray-300 border-gray-200';
+  if (s === '연재중') return 'bg-emerald-50 text-emerald-700 border-emerald-300';
+  if (s.includes('번역 필요')) return 'bg-amber-50 text-amber-700 border-amber-300';
+  if (s.includes('번역 불필요')) return 'bg-blue-50 text-blue-700 border-blue-300';
+  if (s === '완결') return 'bg-indigo-50 text-indigo-700 border-indigo-300';
+  if (s === '연재 불가') return 'bg-gray-100 text-gray-400 border-gray-200';
+  if (s === '휴재') return 'bg-orange-50 text-orange-600 border-orange-300';
+  if (s === '계약종료') return 'bg-rose-50 text-rose-600 border-rose-300';
+  return 'bg-violet-50 text-violet-600 border-violet-200'; // 비활성화/업커밍/연재준비중 등
+}
+
+/* ── 국내 상태 배지 ── */
+function KrStatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-gray-300 text-xs">—</span>;
   const s = status.toLowerCase();
   let dot = 'bg-gray-400', bg = 'bg-gray-50', text = 'text-gray-500';
@@ -22,226 +37,260 @@ function StatusBadge({ status }: { status: string | null }) {
   );
 }
 
-/* ── 플랫폼 배지 ── */
-const PLATFORM_COLORS: Record<string, string> = {
-  '투믹스': 'bg-purple-50 text-purple-700',
-  '네이버': 'bg-green-50 text-green-700',
-  '카카오': 'bg-yellow-50 text-yellow-700',
-  '레진': 'bg-red-50 text-red-700',
-  '리디': 'bg-blue-50 text-blue-700',
-};
-function PlatformBadge({ name }: { name: string | null }) {
-  if (!name) return <span className="text-gray-300 text-xs">—</span>;
-  const cls = PLATFORM_COLORS[name] ?? 'bg-gray-100 text-gray-600';
-  return <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-medium ${cls}`}>{name}</span>;
+/* ── 필터 토글 버튼 (pill) ── */
+function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${active ? 'bg-[#1a1a2e] border-[#1a1a2e] text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+      {children}
+    </button>
+  );
 }
 
-/* ── 정렬 아이콘 ── */
-function SortIcon({ col, sort, dir }: { col: string; sort: string; dir: 'asc' | 'desc' }) {
-  if (sort !== col) return <span className="text-gray-300 ml-0.5 text-[10px]">↕</span>;
-  return <span className="text-indigo-500 ml-0.5 text-[10px]">{dir === 'asc' ? '↑' : '↓'}</span>;
-}
-
-const PAGE_SIZES = [20, 50, 100];
-
-type SortKey = 'title_ko' | 'platform_name' | 'kr_status' | 'total_episodes';
+type StatusMap = Record<string, Record<string, string | null>>;
 
 export default function HomePage() {
   const router = useRouter();
   const [works, setWorks] = useState<Work[]>([]);
+  const [statusMap, setStatusMap] = useState<StatusMap>({});
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // 필터
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('');
-  const [genreFilter, setGenreFilter] = useState('');
+  const [scopeFilter, setScopeFilter] = useState('');        // 글로벌 / 인터널
+  const [platformFilter, setPlatformFilter] = useState('');  // TG(투믹스) / LA(라라툰)
+  const [maturityFilter, setMaturityFilter] = useState('');  // 성인 / 비성인
+  const [krStatusFilter, setKrStatusFilter] = useState('');  // 연재/완결/휴재/종료
+  const [publisherFilter, setPublisherFilter] = useState('');
+  const [langFilter, setLangFilter] = useState('');          // EN/ESP/... (언어권)
+  const [langStatusFilter, setLangStatusFilter] = useState(''); // 언어권 상태값
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState<SortKey>('title_ko');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     async function fetchAll() {
-      const size = 1000;
-      let all: Work[] = [];
+      // 1) 작품 마스터
+      const all: Work[] = [];
       let from = 0;
+      const size = 1000;
       while (true) {
         const { data, error } = await supabase
-          .from('works')
-          .select('work_id, title_ko, title_en, platform_name, genre, kr_status, total_episodes, is_adult, writer_ko, artist_ko')
-          .order('title_ko')
+          .from('series_data')
+          .select('id, title_ko, title_en, platform, genre, kr_status, total_episodes, maturity, scope, publisher, writer, artist')
+          .order('id', { ascending: false })
           .range(from, from + size - 1);
         if (error || !data || data.length === 0) break;
-        all = all.concat(data as Work[]);
+        for (const r of data as Record<string, string | null>[]) {
+          all.push({
+            work_id: r.id ?? '',
+            title_ko: r.title_ko ?? '',
+            title_en: r.title_en ?? null,
+            platform_name: r.platform ?? null,
+            genre: r.genre ?? null,
+            kr_status: r.kr_status ?? null,
+            total_episodes: r.total_episodes ?? null,
+            free_episodes: null,
+            open_episodes: null,
+            is_adult: r.maturity === '성인',
+            maturity: r.maturity ?? null,
+            scope: r.scope ?? null,
+            publisher: r.publisher ?? null,
+            writer_ko: r.writer ?? null,
+            artist_ko: r.artist ?? null,
+          });
+        }
         if (data.length < size) break;
         from += size;
       }
       setWorks(all);
       setLoading(false);
+
+      // 2) 언어권 상태 (배지용) — 작품번호 → 상태행
+      const map: StatusMap = {};
+      let sFrom = 0;
+      const statusCols = LIST_LANGS.map(l => l.statusCol).join(',');
+      while (true) {
+        const { data, error } = await supabase
+          .from('language_status')
+          .select(`작품번호,${statusCols}`)
+          .range(sFrom, sFrom + size - 1);
+        if (error || !data || data.length === 0) break;
+        for (const r of data as unknown as Record<string, string | null>[]) {
+          const wid = r['작품번호'];
+          if (wid) map[wid] = r;
+        }
+        if (data.length < size) break;
+        sFrom += size;
+      }
+      setStatusMap(map);
     }
     fetchAll();
   }, []);
 
-  const platforms = useMemo(() => [...new Set(works.map(w => w.platform_name).filter(Boolean))].sort() as string[], [works]);
-  const genres = useMemo(() => [...new Set(works.map(w => w.genre).filter(Boolean))].sort() as string[], [works]);
+  const publishers = useMemo(
+    () => [...new Set(works.map(w => w.publisher).filter(Boolean))].sort() as string[],
+    [works]
+  );
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    // 영문 자판 입력이면 원본 케이스 유지한 채 한글 변환 (Q=ㅃ, R=ㄲ 등 대문자 쌍자음 보존)
     const qKr = search && looksLikeEngInput(search) ? engToKorean(search).toLowerCase() : '';
     const matchText = (target: string | null) => {
       if (!target) return false;
       const t = target.toLowerCase();
-      const tDecomp = decomposeKorean(t);
-      if (t.includes(q) || tDecomp.includes(q)) return true;
-      if (qKr && (t.includes(qKr) || tDecomp.includes(qKr))) return true;
+      const tD = decomposeKorean(t);
+      if (t.includes(q) || tD.includes(q)) return true;
+      if (qKr && (t.includes(qKr) || tD.includes(qKr))) return true;
       return false;
     };
-    let list = works.filter(w => {
-      if (q && !matchText(w.title_ko) && !matchText(w.title_en) && !matchText(w.work_id) && !matchText(w.writer_ko)) return false;
-      if (statusFilter && !w.kr_status?.includes(statusFilter)) return false;
-      if (platformFilter && w.platform_name !== platformFilter) return false;
-      if (genreFilter && w.genre !== genreFilter) return false;
+    return works.filter(w => {
+      if (q && !matchText(w.title_ko) && !matchText(w.title_en) && !matchText(w.work_id) && !matchText(w.writer_ko) && !matchText(w.publisher)) return false;
+      if (scopeFilter && w.scope !== scopeFilter) return false;
+      if (platformFilter && !(w.platform_name ?? '').includes(platformFilter)) return false;
+      if (maturityFilter === '성인' && w.maturity !== '성인') return false;
+      if (maturityFilter === '비성인' && w.maturity === '성인') return false;
+      if (krStatusFilter && !w.kr_status?.includes(krStatusFilter)) return false;
+      if (publisherFilter && w.publisher !== publisherFilter) return false;
+      // 언어권 상태 필터
+      if (langStatusFilter) {
+        const row = statusMap[w.work_id];
+        if (langFilter) {
+          const col = LIST_LANGS.find(l => l.label === langFilter)?.statusCol;
+          if (!col || row?.[col] !== langStatusFilter) return false;
+        } else {
+          const anyMatch = LIST_LANGS.some(l => row?.[l.statusCol] === langStatusFilter);
+          if (!anyMatch) return false;
+        }
+      }
       return true;
     });
-    list = [...list].sort((a, b) => {
-      const av = (a[sortKey] ?? '') as string | number;
-      const bv = (b[sortKey] ?? '') as string | number;
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return list;
-  }, [works, search, statusFilter, platformFilter, genreFilter, sortKey, sortDir]);
+  }, [works, statusMap, search, scopeFilter, platformFilter, maturityFilter, krStatusFilter, publisherFilter, langFilter, langStatusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const hasFilter = search || statusFilter || platformFilter || genreFilter;
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, platformFilter, genreFilter, pageSize]);
+  useEffect(() => { setPage(1); }, [search, scopeFilter, platformFilter, maturityFilter, krStatusFilter, publisherFilter, langFilter, langStatusFilter, pageSize]);
 
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
+  const hasFilter = search || scopeFilter || platformFilter || maturityFilter || krStatusFilter || publisherFilter || langFilter || langStatusFilter;
+  function resetFilters() {
+    setSearch(''); setScopeFilter(''); setPlatformFilter(''); setMaturityFilter('');
+    setKrStatusFilter(''); setPublisherFilter(''); setLangFilter(''); setLangStatusFilter('');
   }
-
-  function toggleSelect(id: string) {
-    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  }
-  function toggleAll() {
-    if (selected.size === paginated.length) setSelected(new Set());
-    else setSelected(new Set(paginated.map(w => w.work_id)));
-  }
-
-  const from = (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, filtered.length);
 
   return (
-    <div className="min-h-screen bg-[#f8f8f9] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#1a1a2e] px-5 h-11 flex items-center shrink-0">
-        <span className="text-white/40 text-xs font-medium tracking-widest uppercase">작품 대시보드</span>
-      </header>
-
-      {/* Toolbar */}
-      <div className="bg-white border-b border-gray-100 px-5 py-2 sticky top-0 z-20">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
-            <input
-              type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="작품명, 영문명, 작가 검색 (한/영 자동변환)"
-              className="pl-8 pr-3 py-1.5 w-64 rounded-md border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
-            />
-          </div>
-
-          <div className="h-4 w-px bg-gray-200" />
-
-          {/* Status */}
-          <div className="relative">
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className={`appearance-none pl-14 pr-6 py-1.5 rounded-md text-[13px] border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors ${statusFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-600'}`}>
-              <option value="">All</option>
-              <option value="연재">연재</option>
-              <option value="완결">완결</option>
-              <option value="휴재">휴재</option>
-            </select>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-medium">Status</span>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">▾</span>
-          </div>
-
-          {/* Platform */}
-          <div className="relative">
-            <select value={platformFilter} onChange={e => setPlatformFilter(e.target.value)}
-              className={`appearance-none pl-16 pr-6 py-1.5 rounded-md text-[13px] border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors ${platformFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-600'}`}>
-              <option value="">All</option>
-              {platforms.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-medium">Platform</span>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">▾</span>
-          </div>
-
-          {/* Genre */}
-          <div className="relative">
-            <select value={genreFilter} onChange={e => setGenreFilter(e.target.value)}
-              className={`appearance-none pl-12 pr-6 py-1.5 rounded-md text-[13px] border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors ${genreFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-600'}`}>
-              <option value="">All</option>
-              {genres.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-medium">Genre</span>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">▾</span>
-          </div>
-
-          {hasFilter && (
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setPlatformFilter(''); setGenreFilter(''); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-[12px] text-gray-400 hover:text-gray-600 border border-gray-200 rounded-md transition-colors">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-              필터 초기화
-            </button>
-          )}
-
-          <div className="ml-auto flex items-center gap-3">
-            {/* 페이지당 개수 */}
-            <div className="flex items-center border border-gray-200 rounded-md overflow-hidden">
-              {PAGE_SIZES.map(n => (
-                <button key={n} onClick={() => setPageSize(n)}
-                  className={`px-2.5 py-1 text-[12px] transition-colors ${pageSize === n ? 'bg-indigo-600 text-white font-medium' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-                  {n}
-                </button>
-              ))}
+    <div className="min-h-screen bg-[#f4f5f7] flex flex-col">
+      {/* 필터 카드 */}
+      <div className="px-5 pt-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="작품명, 번호, 출판사, 작가..."
+                className="pl-9 pr-3 py-2 w-full rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
+              />
             </div>
+            <button onClick={() => setFiltersOpen(o => !o)}
+              className="shrink-0 px-3 py-2 rounded-lg border border-gray-200 text-[12px] text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+              {filtersOpen ? '▲ 필터 접기' : '▼ 필터 펼치기'}
+            </button>
           </div>
+
+          {filtersOpen && (
+            <div className="mt-4 space-y-2.5 text-[13px]">
+              <FilterRow label="구분">
+                <Pill active={!scopeFilter} onClick={() => setScopeFilter('')}>전체</Pill>
+                <Pill active={scopeFilter === '글로벌'} onClick={() => setScopeFilter('글로벌')}>글로벌</Pill>
+                <Pill active={scopeFilter === '인터널'} onClick={() => setScopeFilter('인터널')}>인터널</Pill>
+                <Divider />
+                <span className="text-gray-400 text-[12px] mr-1">플랫폼</span>
+                <Pill active={!platformFilter} onClick={() => setPlatformFilter('')}>전체</Pill>
+                <Pill active={platformFilter === 'TG'} onClick={() => setPlatformFilter('TG')}>투믹스</Pill>
+                <Pill active={platformFilter === 'LA'} onClick={() => setPlatformFilter('LA')}>라라툰</Pill>
+                <Divider />
+                <span className="text-gray-400 text-[12px] mr-1">분류</span>
+                <Pill active={!maturityFilter} onClick={() => setMaturityFilter('')}>전체</Pill>
+                <Pill active={maturityFilter === '성인'} onClick={() => setMaturityFilter('성인')}>성인</Pill>
+                <Pill active={maturityFilter === '비성인'} onClick={() => setMaturityFilter('비성인')}>비성인</Pill>
+                <Divider />
+                <span className="text-gray-400 text-[12px] mr-1">국내 상태</span>
+                <Pill active={!krStatusFilter} onClick={() => setKrStatusFilter('')}>전체</Pill>
+                <Pill active={krStatusFilter === '연재'} onClick={() => setKrStatusFilter('연재')}>연재 중</Pill>
+                <Pill active={krStatusFilter === '완결'} onClick={() => setKrStatusFilter('완결')}>완결</Pill>
+                <Pill active={krStatusFilter === '휴재'} onClick={() => setKrStatusFilter('휴재')}>휴재</Pill>
+                <Pill active={krStatusFilter === '종료'} onClick={() => setKrStatusFilter('종료')}>종료</Pill>
+                <Divider />
+                <span className="text-gray-400 text-[12px] mr-1">출판사</span>
+                <select value={publisherFilter} onChange={e => setPublisherFilter(e.target.value)}
+                  className="px-2 py-1 rounded-md border border-gray-200 text-[12px] text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <option value="">전체</option>
+                  {publishers.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </FilterRow>
+
+              <FilterRow label="언어권">
+                <Pill active={!langFilter} onClick={() => setLangFilter('')}>전체</Pill>
+                {LIST_LANGS.map(l => (
+                  <Pill key={l.label} active={langFilter === l.label} onClick={() => setLangFilter(langFilter === l.label ? '' : l.label)}>{l.label}</Pill>
+                ))}
+                <Divider />
+                <span className="text-gray-400 text-[12px] mr-1">언어권 상태</span>
+                <Pill active={!langStatusFilter} onClick={() => setLangStatusFilter('')}>전체</Pill>
+                {LANG_STATUS_FILTERS.map(s => (
+                  <Pill key={s.value} active={langStatusFilter === s.value} onClick={() => setLangStatusFilter(langStatusFilter === s.value ? '' : s.value)}>{s.label}</Pill>
+                ))}
+              </FilterRow>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Table */}
-      <main className="flex-1 px-5 py-4">
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-          <table className="w-full border-collapse text-[13px]">
+      {/* 카운트 + 범례 + 페이지당 */}
+      <div className="px-5 py-3 flex items-center gap-4 flex-wrap">
+        <span className="text-[13px] text-gray-500">
+          총 <span className="font-semibold text-gray-800">{loading ? '…' : filtered.length.toLocaleString()}</span>개 작품 표시 중
+        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] text-gray-400">언어권:</span>
+          {[
+            { label: '연재 중', v: '연재중' },
+            { label: '번역 필요', v: '연재 가능(번역 필요)' },
+            { label: '번역 불필요', v: '연재 가능(번역 불필요)' },
+            { label: '연재 불가', v: '연재 불가' },
+            { label: '완결', v: '완결' },
+          ].map(x => (
+            <span key={x.v} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${langStatusStyle(x.v)}`}>{x.label}</span>
+          ))}
+        </div>
+        {hasFilter && (
+          <button onClick={resetFilters} className="text-[12px] text-gray-400 hover:text-gray-600 underline">필터 초기화</button>
+        )}
+        <div className="ml-auto flex items-center border border-gray-200 rounded-md overflow-hidden bg-white">
+          {PAGE_SIZES.map(n => (
+            <button key={n} onClick={() => setPageSize(n)}
+              className={`px-2.5 py-1 text-[12px] transition-colors ${pageSize === n ? 'bg-indigo-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-50'}`}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* 테이블 */}
+      <main className="flex-1 px-5 pb-6">
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm overflow-x-auto">
+          <table className="w-full border-collapse text-[13px] min-w-[900px]">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/80">
-                <th className="w-9 pl-4 py-2.5">
-                  <input type="checkbox" checked={selected.size === paginated.length && paginated.length > 0}
-                    onChange={toggleAll}
-                    className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 cursor-pointer accent-indigo-600" />
-                </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide cursor-pointer select-none" onClick={() => toggleSort('title_ko')}>
-                  Title <SortIcon col="title_ko" sort={sortKey} dir={sortDir} />
-                </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden xl:table-cell">Genre</th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Author</th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide cursor-pointer select-none hidden sm:table-cell" onClick={() => toggleSort('platform_name')}>
-                  Platform <SortIcon col="platform_name" sort={sortKey} dir={sortDir} />
-                </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide cursor-pointer select-none" onClick={() => toggleSort('kr_status')}>
-                  Status <SortIcon col="kr_status" sort={sortKey} dir={sortDir} />
-                </th>
-                <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide cursor-pointer select-none hidden md:table-cell pr-5" onClick={() => toggleSort('total_episodes')}>
-                  Episodes <SortIcon col="total_episodes" sort={sortKey} dir={sortDir} />
-                </th>
+              <tr className="border-b border-gray-100 bg-gray-50/80 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                <th className="text-left px-4 py-3 w-20">번호</th>
+                <th className="text-left px-3 py-3 w-20">구분</th>
+                <th className="text-left px-3 py-3 w-32 hidden lg:table-cell">출판사</th>
+                <th className="text-left px-3 py-3">작품명</th>
+                <th className="text-left px-3 py-3 w-20 hidden md:table-cell">분류</th>
+                <th className="text-left px-3 py-3 w-20 hidden sm:table-cell">플랫폼</th>
+                <th className="text-left px-3 py-3 w-[230px]">언어권</th>
               </tr>
             </thead>
             <tbody>
@@ -255,73 +304,86 @@ export default function HomePage() {
                   {hasFilter ? '조건에 맞는 작품이 없습니다.' : '등록된 작품이 없습니다.'}
                 </td></tr>
               )}
-              {!loading && paginated.map((work, i) => (
-                <tr key={work.work_id}
-                  className={`group border-b border-gray-50 last:border-0 hover:bg-indigo-50/40 transition-colors ${selected.has(work.work_id) ? 'bg-indigo-50/60' : ''}`}>
-                  <td className="w-9 pl-4 py-2.5" onClick={e => { e.stopPropagation(); toggleSelect(work.work_id); }}>
-                    <input type="checkbox" checked={selected.has(work.work_id)} onChange={() => toggleSelect(work.work_id)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer accent-indigo-600" />
-                  </td>
-                  <td className="px-3 py-2.5 cursor-pointer" onClick={() => router.push(`/works/${work.work_id}`)}>
-                    <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight">{work.title_ko}</div>
-                    {work.title_en && <div className="text-[11px] text-gray-400 mt-0.5 leading-tight truncate max-w-[280px]">{work.title_en}</div>}
-                  </td>
-                  <td className="px-3 py-2.5 hidden xl:table-cell">
-                    <span className="text-[12px] text-gray-500 line-clamp-1">{work.genre ?? '—'}</span>
-                  </td>
-                  <td className="px-3 py-2.5 hidden lg:table-cell cursor-pointer" onClick={() => router.push(`/works/${work.work_id}`)}>
-                    <span className="text-[12px] text-gray-600">{work.writer_ko ?? work.artist_ko ?? '—'}</span>
-                  </td>
-                  <td className="px-3 py-2.5 hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/works/${work.work_id}`)}>
-                    <PlatformBadge name={work.platform_name} />
-                  </td>
-                  <td className="px-3 py-2.5 cursor-pointer" onClick={() => router.push(`/works/${work.work_id}`)}>
-                    <StatusBadge status={work.kr_status} />
-                  </td>
-                  <td className="px-3 py-2.5 text-right hidden md:table-cell pr-5 cursor-pointer" onClick={() => router.push(`/works/${work.work_id}`)}>
-                    <span className="text-[12px] text-gray-500 tabular-nums">{work.total_episodes ?? '—'}</span>
-                  </td>
-                </tr>
-              ))}
+              {!loading && paginated.map(work => {
+                const srow = statusMap[work.work_id];
+                return (
+                  <tr key={work.work_id}
+                    onClick={() => router.push(`/works/${work.work_id}`)}
+                    className="group border-b border-gray-50 last:border-0 hover:bg-indigo-50/40 transition-colors cursor-pointer">
+                    <td className="px-4 py-3 text-gray-500 tabular-nums align-top">{work.work_id}</td>
+                    <td className="px-3 py-3 align-top">
+                      {work.scope
+                        ? <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium ${work.scope === '글로벌' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{work.scope}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-gray-500 hidden lg:table-cell align-top">{work.publisher ?? '—'}</td>
+                    <td className="px-3 py-3 align-top">
+                      <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight">{work.title_ko}</div>
+                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate max-w-[360px]">{work.title_en}</div>}
+                    </td>
+                    <td className="px-3 py-3 hidden md:table-cell align-top">
+                      {work.maturity
+                        ? <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${work.maturity === '성인' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{work.maturity}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-gray-600 hidden sm:table-cell align-top">{work.platform_name ?? '—'}</td>
+                    <td className="px-3 py-3 align-top">
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {LIST_LANGS.map(l => (
+                          <span key={l.label}
+                            title={srow?.[l.statusCol] ?? undefined}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${langStatusStyle(srow?.[l.statusCol])}`}>
+                            {l.label}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-3 px-1">
-          <span className="text-[12px] text-gray-400">
-            {loading ? '' : filtered.length === 0 ? '결과 없음' : `Showing ${from} to ${to} of ${filtered.length} results`}
-          </span>
-
-          {!loading && totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button onClick={() => setPage(1)} disabled={page === 1}
-                className="px-2 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">«</button>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-2.5 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
-
-              {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-                let p: number;
-                if (totalPages <= 7) p = i + 1;
-                else if (page <= 4) p = i + 1;
-                else if (page >= totalPages - 3) p = totalPages - 6 + i;
-                else p = page - 3 + i;
-                return (
-                  <button key={p} onClick={() => setPage(p)}
-                    className={`w-7 py-1 text-[12px] rounded border transition-colors ${page === p ? 'bg-indigo-600 border-indigo-600 text-white font-medium' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                    {p}
-                  </button>
-                );
-              })}
-
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-2.5 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">›</button>
-              <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-                className="px-2 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">»</button>
-            </div>
-          )}
-        </div>
+        {/* 페이지네이션 */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-end gap-1 mt-3">
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="px-2 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-2.5 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30">‹</button>
+            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+              let p: number;
+              if (totalPages <= 7) p = i + 1;
+              else if (page <= 4) p = i + 1;
+              else if (page >= totalPages - 3) p = totalPages - 6 + i;
+              else p = page - 3 + i;
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-7 py-1 text-[12px] rounded border transition-colors ${page === p ? 'bg-indigo-600 border-indigo-600 text-white font-medium' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>{p}</button>
+              );
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-2.5 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30">›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="px-2 py-1 text-[12px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30">»</button>
+          </div>
+        )}
       </main>
     </div>
   );
+}
+
+/* ── 필터 한 줄 (라벨 + 컨트롤들) ── */
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-gray-400 text-[12px] w-14 shrink-0">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Divider() {
+  return <span className="h-4 w-px bg-gray-200 mx-1.5" />;
 }
