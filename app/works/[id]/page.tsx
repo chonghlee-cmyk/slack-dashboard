@@ -235,6 +235,7 @@ export default function WorkDetailPage() {
       publisher: s.publisher,
       writer_ko: s.writer,
       artist_ko: s.artist,
+      copyright: s.copyright ?? null,
     } : null);
 
     // language_data + language_status → 언어별 뷰모델 (앱 탭 9개로 펼침)
