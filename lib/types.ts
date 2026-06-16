@@ -19,6 +19,7 @@ export interface Work {
   publisher: string | null;      // series_data.publisher
   writer_ko: string | null;      // series_data.writer
   artist_ko: string | null;      // series_data.artist
+  copyright: string | null;      // series_data.copyright
 }
 
 // 목록 언어권 배지: 라벨 ↔ language_status 컬럼 (SC 제외 9개)

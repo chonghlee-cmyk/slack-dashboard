@@ -78,7 +78,7 @@ export default function HomePage() {
       while (true) {
         const { data, error } = await supabase
           .from('series_data')
-          .select('id, title_ko, title_en, platform, genre, kr_status, total_episodes, maturity, scope, publisher, writer, artist')
+          .select('id, title_ko, title_en, platform, genre, kr_status, total_episodes, maturity, scope, publisher, writer, artist, copyright')
           .order('id', { ascending: false })
           .range(from, from + size - 1);
         if (error || !data || data.length === 0) break;
@@ -99,6 +99,7 @@ export default function HomePage() {
             publisher: r.publisher ?? null,
             writer_ko: r.writer ?? null,
             artist_ko: r.artist ?? null,
+            copyright: r.copyright ?? null,
           });
         }
         if (data.length < size) break;
@@ -129,10 +130,13 @@ export default function HomePage() {
     fetchAll();
   }, []);
 
-  const publishers = useMemo(
-    () => [...new Set(works.map(w => w.publisher).filter(Boolean))].sort() as string[],
-    [works]
-  );
+  const PINNED_PUBLISHERS = ['투믹스', '테라핀', '키다리스튜디오', '레진코믹스'];
+  const publishers = useMemo(() => {
+    const all = [...new Set(works.map(w => w.publisher).filter(Boolean))] as string[];
+    const pinned = PINNED_PUBLISHERS.filter(p => all.includes(p));
+    const rest = all.filter(p => !PINNED_PUBLISHERS.includes(p)).sort();
+    return [...pinned, ...rest];
+  }, [works]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -281,26 +285,29 @@ export default function HomePage() {
       {/* 테이블 */}
       <main className="flex-1 px-5 pb-6">
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm overflow-x-auto">
-          <table className="w-full border-collapse text-[13px] min-w-[900px]">
+          <table className="w-full border-collapse text-[13px] min-w-[1200px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                <th className="text-left px-4 py-3 w-20">번호</th>
+                <th className="text-left px-4 py-3 w-20">작품번호</th>
                 <th className="text-left px-3 py-3 w-20">구분</th>
-                <th className="text-left px-3 py-3 w-32 hidden lg:table-cell">출판사</th>
+                <th className="text-left px-3 py-3 w-28">출판사</th>
                 <th className="text-left px-3 py-3">작품명</th>
-                <th className="text-left px-3 py-3 w-20 hidden md:table-cell">분류</th>
-                <th className="text-left px-3 py-3 w-20 hidden sm:table-cell">플랫폼</th>
+                <th className="text-left px-3 py-3 w-20">분류</th>
+                <th className="text-left px-3 py-3 w-20">플랫폼</th>
+                <th className="text-left px-3 py-3 w-28">글작가</th>
+                <th className="text-left px-3 py-3 w-28">그림작가</th>
+                <th className="text-left px-3 py-3 w-40">Copyright</th>
                 <th className="text-left px-3 py-3 w-[230px]">언어권</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="text-center py-20 text-gray-400">
+                <tr><td colSpan={10} className="text-center py-20 text-gray-400">
                   <span className="inline-block w-4 h-4 border-2 border-gray-200 border-t-indigo-500 rounded-full animate-spin mr-2 align-middle" />불러오는 중…
                 </td></tr>
               )}
               {!loading && paginated.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-20 text-gray-400">
+                <tr><td colSpan={10} className="text-center py-20 text-gray-400">
                   {hasFilter ? '조건에 맞는 작품이 없습니다.' : '등록된 작품이 없습니다.'}
                 </td></tr>
               )}
@@ -316,17 +323,20 @@ export default function HomePage() {
                         ? <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium ${work.scope === '글로벌' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{work.scope}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-500 hidden lg:table-cell align-top">{work.publisher ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 align-top">{work.publisher ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
                       <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight">{work.title_ko}</div>
-                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate max-w-[360px]">{work.title_en}</div>}
+                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate max-w-[260px]">{work.title_en}</div>}
                     </td>
-                    <td className="px-3 py-3 hidden md:table-cell align-top">
+                    <td className="px-3 py-3 align-top">
                       {work.maturity
                         ? <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${work.maturity === '성인' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{work.maturity}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-600 hidden sm:table-cell align-top">{work.platform_name ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top">{work.platform_name ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">{work.writer_ko ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">{work.artist_ko ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug">{work.copyright ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-wrap gap-1 max-w-[220px]">
                         {LIST_LANGS.map(l => (
