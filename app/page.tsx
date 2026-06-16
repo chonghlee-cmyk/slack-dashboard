@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Work, LIST_LANGS, LANG_STATUS_FILTERS } from '@/lib/types';
@@ -460,21 +460,33 @@ function Divider() {
   return <span className="h-4 w-px bg-gray-200 mx-1.5" />;
 }
 
-/* ── 셀 메모 dot + 클릭 팝오버 ── */
+/* ── 셀 메모 dot + 클릭 팝오버 (fixed 포지셔닝 — overflow 클리핑 방지) ── */
 function MemoTip({ memo }: { memo: string | null | undefined }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+
   if (!memo?.trim()) return null;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.top - 8, left: r.left + r.width / 2 });
+    }
+    setOpen(o => !o);
+  };
+
   return (
-    <span className="relative shrink-0 inline-flex items-center" onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen(o => !o)}
+    <span className="shrink-0 inline-flex items-center">
+      <button ref={btnRef} onClick={handleClick}
         className="w-1.5 h-1.5 rounded-full bg-amber-400 hover:bg-amber-500 cursor-pointer"
-        aria-label="메모 보기"
-      />
+        aria-label="메모 보기" />
       {open && (
         <>
-          <span className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-white border border-amber-200 text-gray-700 text-[11px] rounded-lg px-2.5 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
+          <span className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setOpen(false); }} />
+          <span className="fixed z-50 -translate-x-1/2 -translate-y-full w-56 bg-white border border-amber-200 text-gray-700 text-[11px] rounded-lg px-2.5 py-2 shadow-xl whitespace-pre-wrap leading-relaxed"
+            style={{ top: pos.top, left: pos.left }}>
             {memo}
           </span>
         </>
