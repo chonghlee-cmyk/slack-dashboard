@@ -11,18 +11,18 @@ const PAGE_SIZES = [20, 50, 100];
 /* ── 언어권 상태 → 색상 ── */
 function langStatusStyle(s: string | null | undefined): string {
   if (!s || s === '-' || s === '') return 'bg-gray-50 text-gray-300 border-gray-200';
-  if (s === '연재중')              return 'bg-emerald-50 text-emerald-700 border-emerald-300';
-  if (s.includes('번역 필요'))     return 'bg-amber-50 text-amber-700 border-amber-300';
-  if (s.includes('번역 불필요'))   return 'bg-blue-50 text-blue-700 border-blue-300';
-  if (s === '연재준비중')          return 'bg-sky-50 text-sky-600 border-sky-300';
-  if (s === '업커밍')              return 'bg-violet-50 text-violet-600 border-violet-300';
-  if (s === '휴재')                return 'bg-orange-50 text-orange-600 border-orange-300';
-  if (s === '완결')                return 'bg-indigo-50 text-indigo-700 border-indigo-300';
-  if (s === '연재 불가')           return 'bg-gray-100 text-gray-400 border-gray-200';
-  if (s === '연재안함')            return 'bg-gray-100 text-gray-400 border-gray-200';
-  if (s === '비활성화')            return 'bg-gray-100 text-gray-300 border-gray-100';
-  if (s === '확인필요')            return 'bg-yellow-50 text-yellow-600 border-yellow-300';
-  if (s === '계약종료')            return 'bg-rose-50 text-rose-600 border-rose-300';
+  if (s === '연재중')              return 'bg-green-50 text-green-800 border-green-300';
+  if (s.includes('번역 필요'))     return 'bg-amber-50 text-amber-800 border-amber-300';
+  if (s.includes('번역 불필요'))   return 'bg-blue-50 text-blue-800 border-blue-300';
+  if (s === '연재준비중')          return 'bg-teal-50 text-teal-800 border-teal-300';
+  if (s === '업커밍')              return 'bg-violet-50 text-violet-800 border-violet-300';
+  if (s === '휴재')                return 'bg-orange-50 text-orange-800 border-orange-300';
+  if (s === '완결')                return 'bg-gray-200 text-gray-700 border-gray-400';
+  if (s === '연재 불가')           return 'bg-red-50 text-red-700 border-red-300';
+  if (s === '연재안함')            return 'bg-pink-50 text-pink-700 border-pink-300';
+  if (s === '비활성화')            return 'bg-gray-100 text-gray-400 border-gray-300';
+  if (s === '확인필요')            return 'bg-yellow-100 text-yellow-800 border-yellow-400';
+  if (s === '계약종료')            return 'bg-gray-700 text-gray-50 border-gray-600';
   return 'bg-gray-50 text-gray-400 border-gray-200';
 }
 
