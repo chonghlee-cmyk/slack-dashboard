@@ -285,19 +285,31 @@ export default function HomePage() {
       {/* 테이블 */}
       <main className="flex-1 px-5 pb-6">
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm overflow-x-auto">
-          <table className="w-full border-collapse text-[13px] min-w-[1200px]">
+          <table className="w-full border-collapse text-[13px] table-fixed min-w-[1280px]">
+            <colgroup>
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[110px]" />
+              <col className="w-[220px]" />
+              <col className="w-[68px]" />
+              <col className="w-[68px]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
+              <col className="w-[154px]" />
+              <col className="w-[230px]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                <th className="text-left px-4 py-3 w-20">작품번호</th>
-                <th className="text-left px-3 py-3 w-20">구분</th>
-                <th className="text-left px-3 py-3 w-28">출판사</th>
+                <th className="text-left px-4 py-3">작품번호</th>
+                <th className="text-left px-3 py-3">구분</th>
+                <th className="text-left px-3 py-3">출판사</th>
                 <th className="text-left px-3 py-3">작품명</th>
-                <th className="text-left px-3 py-3 w-20">분류</th>
-                <th className="text-left px-3 py-3 w-20">플랫폼</th>
-                <th className="text-left px-3 py-3 w-28">글작가</th>
-                <th className="text-left px-3 py-3 w-28">그림작가</th>
-                <th className="text-left px-3 py-3 w-40">Copyright</th>
-                <th className="text-left px-3 py-3 w-[230px]">언어권</th>
+                <th className="text-left px-3 py-3">분류</th>
+                <th className="text-left px-3 py-3">플랫폼</th>
+                <th className="text-left px-3 py-3">글작가</th>
+                <th className="text-left px-3 py-3">그림작가</th>
+                <th className="text-left px-3 py-3">Copyright</th>
+                <th className="text-left px-3 py-3">언어권</th>
               </tr>
             </thead>
             <tbody>
@@ -323,20 +335,20 @@ export default function HomePage() {
                         ? <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium ${work.scope === '글로벌' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{work.scope}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-500 align-top">{work.publisher ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 align-top truncate">{work.publisher ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
-                      <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight">{work.title_ko}</div>
-                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate max-w-[260px]">{work.title_en}</div>}
+                      <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</div>
+                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate">{work.title_en}</div>}
                     </td>
                     <td className="px-3 py-3 align-top">
                       {work.maturity
                         ? <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${work.maturity === '성인' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{work.maturity}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-600 align-top">{work.platform_name ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">{work.writer_ko ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">{work.artist_ko ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug">{work.copyright ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top truncate">{work.platform_name ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px] truncate">{work.writer_ko ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px] truncate">{work.artist_ko ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug truncate">{work.copyright ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-wrap gap-1 max-w-[220px]">
                         {LIST_LANGS.map(l => (
