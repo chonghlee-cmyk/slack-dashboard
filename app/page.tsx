@@ -270,8 +270,15 @@ export default function HomePage() {
             { label: '연재 중', v: '연재중' },
             { label: '번역 필요', v: '연재 가능(번역 필요)' },
             { label: '번역 불필요', v: '연재 가능(번역 불필요)' },
-            { label: '연재 불가', v: '연재 불가' },
+            { label: '연재준비중', v: '연재준비중' },
+            { label: '업커밍', v: '업커밍' },
+            { label: '휴재', v: '휴재' },
             { label: '완결', v: '완결' },
+            { label: '연재 불가', v: '연재 불가' },
+            { label: '연재안함', v: '연재안함' },
+            { label: '비활성화', v: '비활성화' },
+            { label: '확인필요', v: '확인필요' },
+            { label: '계약종료', v: '계약종료' },
           ].map(x => (
             <span key={x.v} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${langStatusStyle(x.v)}`}>{x.label}</span>
           ))}
