@@ -53,16 +53,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 type StatusMap = Record<string, Record<string, string | null>>;
-type MemoMap = Record<string, string>; // workId → 합산 메모 텍스트
-
-const SERIES_MEMO_COLS = [
-  ['title_ko_memo', '작품명'], ['title_en_memo', '영문제목'],
-  ['platform_memo', '플랫폼'], ['publisher_memo', '출판사'],
-  ['genre_memo', '장르'], ['scope_memo', '구분'], ['maturity_memo', '분류'],
-  ['writer_memo', '글작가'], ['artist_memo', '그림작가'], ['copyright_memo', 'Copyright'],
-  ['kr_status_memo', '국내상태'], ['total_episodes_memo', '총화수'],
-  ['notes_memo', '노트'], ['synopsis_memo', '시놉시스'],
-] as const;
+type MemoMap = Record<string, Record<string, string | null>>; // workId → series_memo 전체 row
 
 export default function HomePage() {
   const router = useRouter();
@@ -143,25 +134,18 @@ export default function HomePage() {
       }
       setStatusMap(map);
 
-      // 3) series_memo — 메모 있는 작품 표시용
-      const memoCols = SERIES_MEMO_COLS.map(([col]) => col).join(',');
+      // 3) series_memo — 셀별 메모 (workId → 전체 row)
       const memoResult: MemoMap = {};
       let mFrom = 0;
       while (true) {
         const { data, error } = await supabase
           .from('series_memo')
-          .select(`id,${memoCols}`)
+          .select('id,work_no_memo,title_ko_memo,scope_memo,publisher_memo,maturity_memo,platform_memo,writer_memo,artist_memo,copyright_memo')
           .range(mFrom, mFrom + size - 1);
         if (error || !data || data.length === 0) break;
         for (const r of data as unknown as Record<string, string | null>[]) {
           const wid = r.id;
-          if (!wid) continue;
-          const parts: string[] = [];
-          for (const [col, label] of SERIES_MEMO_COLS) {
-            const v = r[col];
-            if (v && v.trim()) parts.push(`${label}: ${v}`);
-          }
-          if (parts.length > 0) memoResult[wid] = parts.join('\n');
+          if (wid) memoResult[wid] = r;
         }
         if (data.length < size) break;
         mFrom += size;
@@ -373,43 +357,48 @@ export default function HomePage() {
               )}
               {!loading && paginated.map(work => {
                 const srow = statusMap[work.work_id];
-                const memo = memoMap[work.work_id];
+                const mr = memoMap[work.work_id];
                 return (
                   <tr key={work.work_id}
                     onClick={() => router.push(`/works/${work.work_id}`)}
                     className="group border-b border-gray-50 last:border-0 hover:bg-indigo-50/40 transition-colors cursor-pointer">
-                    <td className="px-4 py-3 text-gray-500 tabular-nums align-top">{work.work_id}</td>
+                    <td className="px-4 py-3 text-gray-500 tabular-nums align-top">
+                      <span className="inline-flex items-center gap-1">{work.work_id}<MemoTip memo={mr?.work_no_memo} /></span>
+                    </td>
                     <td className="px-3 py-3 align-top">
                       {work.scope
-                        ? <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium ${work.scope === '글로벌' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{work.scope}</span>
+                        ? <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${work.scope === '글로벌' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{work.scope}<MemoTip memo={mr?.scope_memo} /></span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-500 align-top truncate">{work.publisher ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 align-top">
+                      <span className="inline-flex items-center gap-1 truncate">{work.publisher ?? '—'}<MemoTip memo={mr?.publisher_memo} /></span>
+                    </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex items-start gap-1">
-                        <div>
+                        <div className="min-w-0">
                           <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</div>
                           {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate">{work.title_en}</div>}
                         </div>
-                        {memo && (
-                          <span className="group/memo relative shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
-                            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 cursor-default" />
-                            <span className="pointer-events-none invisible group-hover/memo:visible absolute z-50 left-3 top-0 w-64 bg-gray-900 text-gray-100 text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
-                              {memo}
-                            </span>
-                          </span>
-                        )}
+                        <MemoTip memo={mr?.title_ko_memo} />
                       </div>
                     </td>
                     <td className="px-3 py-3 align-top">
                       {work.maturity
-                        ? <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${work.maturity === '성인' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{work.maturity}</span>
+                        ? <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${work.maturity === '성인' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{work.maturity}<MemoTip memo={mr?.maturity_memo} /></span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-3 text-gray-600 align-top truncate">{work.platform_name ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-600 align-top text-[12px] truncate">{work.writer_ko ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-600 align-top text-[12px] truncate">{work.artist_ko ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug truncate">{work.copyright ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-600 align-top">
+                      <span className="inline-flex items-center gap-1">{work.platform_name ?? '—'}<MemoTip memo={mr?.platform_memo} /></span>
+                    </td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">
+                      <span className="inline-flex items-center gap-1 truncate">{work.writer_ko ?? '—'}<MemoTip memo={mr?.writer_memo} /></span>
+                    </td>
+                    <td className="px-3 py-3 text-gray-600 align-top text-[12px]">
+                      <span className="inline-flex items-center gap-1 truncate">{work.artist_ko ?? '—'}<MemoTip memo={mr?.artist_memo} /></span>
+                    </td>
+                    <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug">
+                      <span className="inline-flex items-center gap-1 truncate">{work.copyright ?? '—'}<MemoTip memo={mr?.copyright_memo} /></span>
+                    </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-nowrap gap-1">
                         {LIST_LANGS.map(l => (
@@ -469,4 +458,17 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 
 function Divider() {
   return <span className="h-4 w-px bg-gray-200 mx-1.5" />;
+}
+
+/* ── 셀 메모 dot + hover 툴팁 ── */
+function MemoTip({ memo }: { memo: string | null | undefined }) {
+  if (!memo?.trim()) return null;
+  return (
+    <span className="group/memo relative shrink-0 inline-flex items-center" onClick={e => e.stopPropagation()}>
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 cursor-default" />
+      <span className="pointer-events-none invisible group-hover/memo:visible absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-gray-900 text-gray-100 text-[11px] rounded-lg px-2.5 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
+        {memo}
+      </span>
+    </span>
+  );
 }
