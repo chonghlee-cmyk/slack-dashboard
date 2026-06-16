@@ -40,9 +40,14 @@ export const LANG_STATUS_FILTERS: { label: string; value: string }[] = [
   { label: '연재 중', value: '연재중' },
   { label: '연재 가능 (번역 필요)', value: '연재 가능(번역 필요)' },
   { label: '연재 가능 (번역 불필요)', value: '연재 가능(번역 불필요)' },
+  { label: '연재준비중', value: '연재준비중' },
+  { label: '업커밍', value: '업커밍' },
   { label: '휴재', value: '휴재' },
   { label: '완결', value: '완결' },
   { label: '연재 불가', value: '연재 불가' },
+  { label: '연재안함', value: '연재안함' },
+  { label: '비활성화', value: '비활성화' },
+  { label: '확인필요', value: '확인필요' },
   { label: '계약 종료', value: '계약종료' },
 ];
 

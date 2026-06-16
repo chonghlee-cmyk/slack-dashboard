@@ -10,15 +10,20 @@ const PAGE_SIZES = [20, 50, 100];
 
 /* ── 언어권 상태 → 색상 ── */
 function langStatusStyle(s: string | null | undefined): string {
-  if (!s || s === '-') return 'bg-gray-50 text-gray-300 border-gray-200';
-  if (s === '연재중') return 'bg-emerald-50 text-emerald-700 border-emerald-300';
-  if (s.includes('번역 필요')) return 'bg-amber-50 text-amber-700 border-amber-300';
-  if (s.includes('번역 불필요')) return 'bg-blue-50 text-blue-700 border-blue-300';
-  if (s === '완결') return 'bg-indigo-50 text-indigo-700 border-indigo-300';
-  if (s === '연재 불가') return 'bg-gray-100 text-gray-400 border-gray-200';
-  if (s === '휴재') return 'bg-orange-50 text-orange-600 border-orange-300';
-  if (s === '계약종료') return 'bg-rose-50 text-rose-600 border-rose-300';
-  return 'bg-violet-50 text-violet-600 border-violet-200'; // 비활성화/업커밍/연재준비중 등
+  if (!s || s === '-' || s === '') return 'bg-gray-50 text-gray-300 border-gray-200';
+  if (s === '연재중')              return 'bg-emerald-50 text-emerald-700 border-emerald-300';
+  if (s.includes('번역 필요'))     return 'bg-amber-50 text-amber-700 border-amber-300';
+  if (s.includes('번역 불필요'))   return 'bg-blue-50 text-blue-700 border-blue-300';
+  if (s === '연재준비중')          return 'bg-sky-50 text-sky-600 border-sky-300';
+  if (s === '업커밍')              return 'bg-violet-50 text-violet-600 border-violet-300';
+  if (s === '휴재')                return 'bg-orange-50 text-orange-600 border-orange-300';
+  if (s === '완결')                return 'bg-indigo-50 text-indigo-700 border-indigo-300';
+  if (s === '연재 불가')           return 'bg-gray-100 text-gray-400 border-gray-200';
+  if (s === '연재안함')            return 'bg-gray-100 text-gray-400 border-gray-200';
+  if (s === '비활성화')            return 'bg-gray-100 text-gray-300 border-gray-100';
+  if (s === '확인필요')            return 'bg-yellow-50 text-yellow-600 border-yellow-300';
+  if (s === '계약종료')            return 'bg-rose-50 text-rose-600 border-rose-300';
+  return 'bg-gray-50 text-gray-400 border-gray-200';
 }
 
 /* ── 국내 상태 배지 ── */
@@ -285,7 +290,7 @@ export default function HomePage() {
       {/* 테이블 */}
       <main className="flex-1 px-5 pb-6">
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm overflow-x-auto">
-          <table className="w-full border-collapse text-[13px] table-fixed min-w-[1280px]">
+          <table className="w-full border-collapse text-[13px] table-fixed min-w-[1350px]">
             <colgroup>
               <col className="w-[80px]" />
               <col className="w-[80px]" />
@@ -296,7 +301,7 @@ export default function HomePage() {
               <col className="w-[110px]" />
               <col className="w-[110px]" />
               <col className="w-[154px]" />
-              <col className="w-[230px]" />
+              <col className="w-[300px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
@@ -350,7 +355,7 @@ export default function HomePage() {
                     <td className="px-3 py-3 text-gray-600 align-top text-[12px] truncate">{work.artist_ko ?? '—'}</td>
                     <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug truncate">{work.copyright ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
-                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                      <div className="flex flex-nowrap gap-1">
                         {LIST_LANGS.map(l => (
                           <span key={l.label}
                             title={srow?.[l.statusCol] ?? undefined}
