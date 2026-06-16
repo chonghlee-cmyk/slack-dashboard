@@ -460,15 +460,25 @@ function Divider() {
   return <span className="h-4 w-px bg-gray-200 mx-1.5" />;
 }
 
-/* ── 셀 메모 dot + hover 툴팁 ── */
+/* ── 셀 메모 dot + 클릭 팝오버 ── */
 function MemoTip({ memo }: { memo: string | null | undefined }) {
+  const [open, setOpen] = useState(false);
   if (!memo?.trim()) return null;
   return (
-    <span className="group/memo relative shrink-0 inline-flex items-center" onClick={e => e.stopPropagation()}>
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 cursor-default" />
-      <span className="pointer-events-none invisible group-hover/memo:visible absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-gray-900 text-gray-100 text-[11px] rounded-lg px-2.5 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
-        {memo}
-      </span>
+    <span className="relative shrink-0 inline-flex items-center" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-1.5 h-1.5 rounded-full bg-amber-400 hover:bg-amber-500 cursor-pointer"
+        aria-label="메모 보기"
+      />
+      {open && (
+        <>
+          <span className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-white border border-amber-200 text-gray-700 text-[11px] rounded-lg px-2.5 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
+            {memo}
+          </span>
+        </>
+      )}
     </span>
   );
 }
