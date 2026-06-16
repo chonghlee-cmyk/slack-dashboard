@@ -153,7 +153,7 @@ export default function HomePage() {
           .select(`id,${memoCols}`)
           .range(mFrom, mFrom + size - 1);
         if (error || !data || data.length === 0) break;
-        for (const r of data as Record<string, string | null>[]) {
+        for (const r of data as unknown as Record<string, string | null>[]) {
           const wid = r.id;
           if (!wid) continue;
           const parts: string[] = [];
