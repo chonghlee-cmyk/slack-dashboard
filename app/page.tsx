@@ -53,11 +53,22 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 type StatusMap = Record<string, Record<string, string | null>>;
+type MemoMap = Record<string, string>; // workId → 합산 메모 텍스트
+
+const SERIES_MEMO_COLS = [
+  ['title_ko_memo', '작품명'], ['title_en_memo', '영문제목'],
+  ['platform_memo', '플랫폼'], ['publisher_memo', '출판사'],
+  ['genre_memo', '장르'], ['scope_memo', '구분'], ['maturity_memo', '분류'],
+  ['writer_memo', '글작가'], ['artist_memo', '그림작가'], ['copyright_memo', 'Copyright'],
+  ['kr_status_memo', '국내상태'], ['total_episodes_memo', '총화수'],
+  ['notes_memo', '노트'], ['synopsis_memo', '시놉시스'],
+] as const;
 
 export default function HomePage() {
   const router = useRouter();
   const [works, setWorks] = useState<Work[]>([]);
   const [statusMap, setStatusMap] = useState<StatusMap>({});
+  const [memoMap, setMemoMap] = useState<MemoMap>({});
   const [loading, setLoading] = useState(true);
 
   // 필터
@@ -131,6 +142,31 @@ export default function HomePage() {
         sFrom += size;
       }
       setStatusMap(map);
+
+      // 3) series_memo — 메모 있는 작품 표시용
+      const memoCols = SERIES_MEMO_COLS.map(([col]) => col).join(',');
+      const memoResult: MemoMap = {};
+      let mFrom = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('series_memo')
+          .select(`id,${memoCols}`)
+          .range(mFrom, mFrom + size - 1);
+        if (error || !data || data.length === 0) break;
+        for (const r of data as Record<string, string | null>[]) {
+          const wid = r.id;
+          if (!wid) continue;
+          const parts: string[] = [];
+          for (const [col, label] of SERIES_MEMO_COLS) {
+            const v = r[col];
+            if (v && v.trim()) parts.push(`${label}: ${v}`);
+          }
+          if (parts.length > 0) memoResult[wid] = parts.join('\n');
+        }
+        if (data.length < size) break;
+        mFrom += size;
+      }
+      setMemoMap(memoResult);
     }
     fetchAll();
   }, []);
@@ -296,7 +332,7 @@ export default function HomePage() {
 
       {/* 테이블 */}
       <main className="flex-1 px-5 pb-6">
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm overflow-x-auto">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
           <table className="w-full border-collapse text-[13px] table-fixed min-w-[1350px]">
             <colgroup>
               <col className="w-[80px]" />
@@ -337,6 +373,7 @@ export default function HomePage() {
               )}
               {!loading && paginated.map(work => {
                 const srow = statusMap[work.work_id];
+                const memo = memoMap[work.work_id];
                 return (
                   <tr key={work.work_id}
                     onClick={() => router.push(`/works/${work.work_id}`)}
@@ -349,8 +386,20 @@ export default function HomePage() {
                     </td>
                     <td className="px-3 py-3 text-gray-500 align-top truncate">{work.publisher ?? '—'}</td>
                     <td className="px-3 py-3 align-top">
-                      <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</div>
-                      {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate">{work.title_en}</div>}
+                      <div className="flex items-start gap-1">
+                        <div>
+                          <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</div>
+                          {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate">{work.title_en}</div>}
+                        </div>
+                        {memo && (
+                          <span className="group/memo relative shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+                            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 cursor-default" />
+                            <span className="pointer-events-none invisible group-hover/memo:visible absolute z-50 left-3 top-0 w-64 bg-gray-900 text-gray-100 text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-pre-wrap leading-relaxed">
+                              {memo}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3 align-top">
                       {work.maturity
