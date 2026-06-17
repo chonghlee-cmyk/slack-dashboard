@@ -327,537 +327,535 @@ export default function WorkDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7]">
-      <div className="bg-[#1a1a2e] text-white px-6 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-white opacity-60 hover:opacity-100 text-sm">← 뒤로</button>
-        <h1 className="text-sm font-medium opacity-70">작품 상세</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Top bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-800">← 뒤로</button>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* 작품 제목 */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+      <div className="px-5 py-5 space-y-4">
+
+        {/* ── 상단 헤더 카드 (풀 너비) ── */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-6 py-5 mb-4">
+          {/* 제목 행 */}
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
               {work.title_ko}<MemoButton memo={seriesMemo?.title_ko_memo} />
             </h2>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColor(work.kr_status)}`}>
+              {work.kr_status ?? '-'}
+            </span>
             {work.title_en && (
-              <p className="text-sm text-gray-400 mt-1 flex items-center">
+              <span className="text-sm text-gray-400 flex items-center">
                 {work.title_en}<MemoButton memo={seriesMemo?.title_en_memo} />
-              </p>
+              </span>
             )}
           </div>
-          <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColor(work.kr_status)}`}>
-            {work.kr_status ?? '-'}
-          </span>
+
+          {/* 메타데이터 행 */}
+          <div className="flex items-start flex-wrap gap-y-3 border-t border-gray-100 pt-4">
+            {[
+              { label: '작품번호', value: work.work_id, memo: seriesMemo?.work_no_memo },
+              { label: '플랫폼', value: work.platform_name ?? '-', memo: seriesMemo?.platform_memo },
+              { label: '장르', value: work.genre ?? '-', memo: seriesMemo?.genre_memo },
+              { label: '총회차', value: work.total_episodes ?? '-', memo: seriesMemo?.total_episodes_memo },
+              { label: '무료회차', value: work.free_episodes ?? '-', memo: seriesMemo?.free_episodes_memo },
+              { label: '오픈회차', value: work.open_episodes ?? '-', memo: seriesMemo?.open_episodes_memo },
+              { label: '성인여부', value: work.is_adult ? '성인' : '비성인', memo: seriesMemo?.maturity_memo },
+              { label: '출판사', value: work.publisher ?? '-', memo: seriesMemo?.publisher_memo },
+            ].map((item, i) => (
+              <div key={item.label} className="flex items-stretch text-sm">
+                {i > 0 && <span className="w-px bg-gray-200 mx-5 self-stretch my-0.5" />}
+                <div>
+                  <div className="text-xs text-gray-400 mb-0.5 flex items-center">
+                    {item.label}<MemoButton memo={item.memo} />
+                  </div>
+                  <div className="font-semibold text-gray-800">{item.value ?? '-'}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* 기본 정보 (셀 hover 시 series_memo 표시) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: '작품번호', value: work.work_id, memoKey: 'work_no_memo' },
-            { label: '플랫폼', value: work.platform_name ?? '-', memoKey: 'platform_memo' },
-            { label: '장르', value: work.genre ?? '-', memoKey: 'genre_memo' },
-            { label: '총회차수', value: work.total_episodes ?? '-', memoKey: 'total_episodes_memo' },
-            { label: '출판사', value: work.publisher ?? '-', memoKey: 'publisher_memo' },
-            { label: '성인여부', value: work.is_adult ? '성인' : '비성인', memoKey: 'maturity_memo' },
-            { label: '무료회차', value: work.free_episodes ? `${work.free_episodes}화` : '-', memoKey: 'free_episodes_memo' },
-            { label: '오픈회차', value: work.open_episodes ? `${work.open_episodes}화` : '-', memoKey: 'open_episodes_memo' },
-          ].map(item => (
-            <div key={item.label} className="bg-white rounded-xl px-4 py-3 shadow-sm">
-              <InfoCell label={item.label} value={item.value} memo={seriesMemo?.[item.memoKey]} />
-            </div>
-          ))}
-        </div>
-
-        {/* 언어권 탭 */}
-        <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-          <div className="flex border-b border-gray-100 overflow-x-auto">
-            {LANG_TABS.map(lang => {
+        {/* ── 언어권 카드 (풀 너비) ── */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-3 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">언어권</p>
+          </div>
+          <div className="grid grid-cols-9">
+            {LANG_TABS.map((lang, idx) => {
               const lobj = languages.find(l => l.language === lang);
               const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
-              return (
-                <button key={lang} onClick={() => setActiveTab(lang)}
-                  className={`px-4 py-3 text-sm font-medium shrink-0 border-b-2 transition-colors ${activeTab === lang ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'} ${!hasData ? 'opacity-40' : ''}`}>
-                  {lang}
-                </button>
+              const br = idx < 8 ? 'border-r border-gray-100' : '';
+              return hasData ? (
+                <div key={lang} className={`px-4 py-3 ${br}`}>
+                  <div className="text-xs font-bold text-gray-800 mb-1.5">{lang}</div>
+                  <div className="space-y-1">
+                    <div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusColor(lobj.serial_status)}`}>
+                        {lobj.serial_status ?? '-'}
+                      </span>
+                    </div>
+                    {[lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].filter(v => v && v !== '-').map((v, i) => (
+                      <div key={i} className="text-xs text-gray-500">{v}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div key={lang} className={`px-4 py-3 opacity-30 ${br}`}>
+                  <div className="text-xs font-bold text-gray-400">{lang}</div>
+                  <div className="text-xs text-gray-300 mt-1">—</div>
+                </div>
               );
             })}
           </div>
-          {activeLang ? (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4">
-              {/* 연재상태 — language_status (뱃지, 셀 메모 없음) */}
-              <div>
-                <div className="text-xs text-gray-400 mb-1">연재상태</div>
-                <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(activeLang.serial_status)}`}>
-                  {activeLang.serial_status ?? '-'}
-                </span>
-              </div>
-              {/* 나머지 — language_data + language_memo (셀 hover) */}
-              <InfoCell label="계약구분" value={activeLang.contract_type ?? '-'} memo={langMemo?.[`${activeData}_contract_memo`]} />
-              <InfoCell label="스토어" value={activeLang.store ?? '-'} memo={langMemo?.[`${activeData}_store_memo`]} />
-              <InfoCell label="일반코인" value={activeLang.coin_regular ?? '-'} memo={langMemo?.[`${activeData}_coin_memo`]} />
-              <InfoCell label="할인코인" value={activeLang.coin_discount ?? '-'} memo={langMemo?.[`${activeData}_coin_sale_memo`]} />
-            </div>
-          ) : (
-            <div className="p-6 text-center text-sm text-gray-400">해당 언어권 데이터 없음</div>
-          )}
         </div>
 
-        {/* 섹션 탭 */}
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {sections.map(s => (
-            <button key={s.key} onClick={() => setActiveSection(s.key as Section)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeSection === s.key ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 shadow-sm'}`}>
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ⭐ 즐겨찾기 */}
-        {activeSection === 'favorites' && (
-          <div className="space-y-4">
-            {favCount === 0 && (
-              <div className="text-center text-sm text-gray-400 py-10 bg-white rounded-xl">
-                ★ 아이템에 별표를 눌러 즐겨찾기에 추가하세요
-              </div>
-            )}
-            {favRevisions.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">📋 원고 수정사항</p>
-                <div className="space-y-2">
-                  {favRevisions.map(r => (
-                    <div key={r.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                      <StarButton active={true} onClick={() => toggleFav('revisions', String(r.id))} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
-                          {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
-                          {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
-                          {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
-                        </div>
-                        {r.image_url && (
-                          <a href={r.image_url} target="_blank" rel="noopener noreferrer">
-                            <img src={r.image_url} alt="원고 이미지" className="mt-2 max-h-48 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 transition-opacity cursor-zoom-in" />
-                          </a>
-                        )}
-                        <p className="text-xs text-gray-400 mt-1">{r.created_at?.slice(0, 10)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {favSlack.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">💬 Slack 메시지</p>
-                <div className="space-y-2">
-                  {favSlack.map(m => (
-                    <div key={m.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                      <StarButton active={true} onClick={() => toggleFav('slack', String(m.id))} />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-indigo-600">{m.sender ?? '-'}</span>
-                            <span className="text-xs text-gray-400">{m.channel_name}</span>
-                          </div>
-                          <span className="text-xs text-gray-400">{m.date} {m.time}</span>
-                        </div>
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{m.content}</p>
-                        {m.permalink && <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline mt-1 inline-block">Slack에서 보기 →</a>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {favMemos.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">📝 메모</p>
-                <div className="space-y-2">
-                  {favMemos.map(m => (
-                    <div key={m.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                      <StarButton active={true} onClick={() => toggleFav('memos', m.id)} />
-                      {m.language && (
-                        <span className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">{m.language}</span>
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-800">{m.memo_content}</p>
-                        <p className="text-xs text-gray-400 mt-1">{m.created_at?.slice(0, 10)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 📋 원고 수정사항 */}
-        {activeSection === 'revisions' && (
-          <div className="space-y-2">
-            {revisions.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">수정사항 없음</div>}
-            {revisions.map(r => (
-              <div key={r.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                <StarButton active={isFav('revisions', String(r.id))} onClick={() => toggleFav('revisions', String(r.id))} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
-                    {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
-                    {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
-                    {r.urgency && <span className="text-xs text-red-400 font-medium">{r.urgency}</span>}
-                    {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
-                  </div>
-                  {r.image_url && (
-                    <a href={r.image_url} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src={r.image_url}
-                        alt="원고 이미지"
-                        className="mt-2 max-h-64 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 transition-opacity cursor-zoom-in"
-                      />
-                    </a>
-                  )}
-                  <p className="text-xs text-gray-400 mt-2">{r.created_at?.slice(0, 10)}</p>
-                </div>
-              </div>
+        {/* ── 섹션 패널 (풀 너비) ── */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-200 px-2">
+            {sections.map(s => (
+              <button key={s.key} onClick={() => setActiveSection(s.key as Section)}
+                className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeSection === s.key
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}>
+                {s.key === 'favorites' ? `즐겨찾기 (${favCount})` :
+                 s.key === 'revisions' ? `원고 수정사항 (${revisions.length})` :
+                 s.key === 'slack' ? `Slack 메시지 (${slackMessages.length})` :
+                 `메모 (${memos.length})`}
+              </button>
             ))}
           </div>
-        )}
 
-        {/* 💬 Slack 메시지 */}
-        {activeSection === 'slack' && (() => {
-          // 검색어 처리 — 영문자판으로 입력한 한글도 변환해서 함께 매칭
-          const rawQuery = slackQuery.trim();
-          const queryActive = rawQuery.length > 0;
-          const queryVariants = queryActive
-            ? Array.from(new Set([
-                rawQuery.toLowerCase(),
-                ...(looksLikeEngInput(rawQuery) ? [engToKorean(rawQuery).toLowerCase()] : []),
-              ]))
-            : [];
-          const matchesQuery = (m: SlackMessage) => {
-            if (!queryActive) return true;
-            const hay = `${msgContent(m)} ${m.sender ?? ''} ${m.category ?? ''}`.toLowerCase();
-            return queryVariants.some(q => hay.includes(q));
-          };
-          let visibleSlack = queryActive ? slackMessages.filter(matchesQuery) : slackMessages;
-          // 시간순 정렬 (오래된 것부터) — 부모/답글 분리 전에 수행
-          visibleSlack = visibleSlack.slice().sort((a, b) => {
-            const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return aTime - bTime;
-          });
+          <div className="p-4">
 
-          // 강조 단어: 작품명 + 작품번호 (항상) + 검색어 (검색 중일 때)
-          const highlightTerms: HighlightTerm[] = [
-            { term: work.title_ko ?? '', className: 'bg-indigo-100 text-indigo-800' },
-            { term: work.work_id ?? '', className: 'bg-emerald-100 text-emerald-800' },
-            ...queryVariants.map(q => ({ term: q, className: 'bg-yellow-200 text-yellow-900' })),
-          ];
-
-          // 스레드 그룹: 부모 메시지 + 그 답글들
-          const parents = visibleSlack.filter(m => !m.is_reply);
-          const repliesByParent = new Map<string, SlackMessage[]>();
-          for (const m of visibleSlack) {
-            if (m.is_reply && m.parent_link) {
-              if (!repliesByParent.has(m.parent_link)) repliesByParent.set(m.parent_link, []);
-              repliesByParent.get(m.parent_link)!.push(m);
-            }
-          }
-          // 부모 없이 답글만 있는 경우도 표시
-          const orphanReplies = visibleSlack.filter(m =>
-            m.is_reply && (!m.parent_link || !parents.some(p => msgPermalink(p) === m.parent_link))
-          );
-
-          // 카테고리별 그룹핑 (이미 시간순으로 정렬된 visibleSlack 유지)
-          const byCategory = new Map<string, SlackMessage[]>();
-          for (const p of [...parents, ...orphanReplies]) {
-            const cat = p.category || '분류 없음';
-            if (!byCategory.has(cat)) byCategory.set(cat, []);
-            byCategory.get(cat)!.push(p);
-          }
-          const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
-          const sortedCategories = [...byCategory.keys()].sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
-
-          const renderMessage = (m: SlackMessage, isReply = false) => {
-            const sender = m.sender ?? '?';
-            const replies = repliesByParent.get(msgPermalink(m)) ?? [];
-            const threadOpen = expandedThreads.has(String(m.id));
-            return (
-              <div key={m.id} className={`${isReply ? 'pl-6 mt-3 border-l-2 border-gray-100 ml-5' : ''}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold ${senderColor(sender)}`}>
-                    {senderInitial(sender)}
+            {/* 즐겨찾기 */}
+            {activeSection === 'favorites' && (
+              <div className="space-y-4">
+                {favCount === 0 && (
+                  <div className="text-center text-sm text-gray-400 py-10">
+                    ★ 아이템에 별표를 눌러 즐겨찾기에 추가하세요
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900">{sender}</span>
-                      <span className="text-xs text-gray-400">{msgDate(m)} {msgTime(m)}</span>
-                      {!isReply && (
-                        <StarButton active={isFav('slack', String(m.id))} onClick={() => toggleFav('slack', String(m.id))} />
+                )}
+                {favRevisions.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">원고 수정사항</p>
+                    <div className="space-y-2">
+                      {favRevisions.map(r => (
+                        <div key={r.id} className="border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                          <StarButton active={true} onClick={() => toggleFav('revisions', String(r.id))} />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
+                              {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
+                              {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
+                              {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
+                            </div>
+                            {r.image_url && (
+                              <a href={r.image_url} target="_blank" rel="noopener noreferrer">
+                                <img src={r.image_url} alt="원고 이미지" className="mt-2 max-h-48 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 cursor-zoom-in" />
+                              </a>
+                            )}
+                            <p className="text-xs text-gray-400 mt-1">{r.created_at?.slice(0, 10)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {favSlack.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Slack 메시지</p>
+                    <div className="space-y-2">
+                      {favSlack.map(m => (
+                        <div key={m.id} className="border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                          <StarButton active={true} onClick={() => toggleFav('slack', String(m.id))} />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-indigo-600">{m.sender ?? '-'}</span>
+                                <span className="text-xs text-gray-400">{m.channel_name}</span>
+                              </div>
+                              <span className="text-xs text-gray-400">{m.date} {m.time}</span>
+                            </div>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap">{m.content}</p>
+                            {m.permalink && <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline mt-1 inline-block">Slack에서 보기 →</a>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {favMemos.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">메모</p>
+                    <div className="space-y-2">
+                      {favMemos.map(m => (
+                        <div key={m.id} className="border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                          <StarButton active={true} onClick={() => toggleFav('memos', m.id)} />
+                          {m.language && <span className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">{m.language}</span>}
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-800">{m.memo_content}</p>
+                            <p className="text-xs text-gray-400 mt-1">{m.created_at?.slice(0, 10)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 원고 수정사항 */}
+            {activeSection === 'revisions' && (
+              <div className="space-y-2">
+                {revisions.length === 0 && <div className="text-center text-sm text-gray-400 py-8">수정사항 없음</div>}
+                {revisions.map(r => (
+                  <div key={r.id} className="border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                    <StarButton active={isFav('revisions', String(r.id))} onClick={() => toggleFav('revisions', String(r.id))} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status ?? '-'}</span>
+                        {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{r.language}</span>}
+                        {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
+                        {r.urgency && <span className="text-xs text-red-400 font-medium">{r.urgency}</span>}
+                        {r.manager && <span className="text-xs text-gray-400">담당: {r.manager}</span>}
+                      </div>
+                      {r.image_url && (
+                        <a href={r.image_url} target="_blank" rel="noopener noreferrer">
+                          <img src={r.image_url} alt="원고 이미지" className="mt-2 max-h-64 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 cursor-zoom-in" />
+                        </a>
+                      )}
+                      <p className="text-xs text-gray-400 mt-2">{r.created_at?.slice(0, 10)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Slack 메시지 */}
+            {activeSection === 'slack' && (() => {
+              const rawQuery = slackQuery.trim();
+              const queryActive = rawQuery.length > 0;
+              const queryVariants = queryActive
+                ? Array.from(new Set([
+                    rawQuery.toLowerCase(),
+                    ...(looksLikeEngInput(rawQuery) ? [engToKorean(rawQuery).toLowerCase()] : []),
+                  ]))
+                : [];
+              const matchesQuery = (m: SlackMessage) => {
+                if (!queryActive) return true;
+                const hay = `${msgContent(m)} ${m.sender ?? ''} ${m.category ?? ''}`.toLowerCase();
+                return queryVariants.some(q => hay.includes(q));
+              };
+              let visibleSlack = queryActive ? slackMessages.filter(matchesQuery) : slackMessages;
+              visibleSlack = visibleSlack.slice().sort((a, b) => {
+                const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return aTime - bTime;
+              });
+
+              const highlightTerms: HighlightTerm[] = [
+                { term: work.title_ko ?? '', className: 'bg-indigo-100 text-indigo-800' },
+                { term: work.work_id ?? '', className: 'bg-emerald-100 text-emerald-800' },
+                ...queryVariants.map(q => ({ term: q, className: 'bg-yellow-200 text-yellow-900' })),
+              ];
+
+              const parents = visibleSlack.filter(m => !m.is_reply);
+              const repliesByParent = new Map<string, SlackMessage[]>();
+              for (const m of visibleSlack) {
+                if (m.is_reply && m.parent_link) {
+                  if (!repliesByParent.has(m.parent_link)) repliesByParent.set(m.parent_link, []);
+                  repliesByParent.get(m.parent_link)!.push(m);
+                }
+              }
+              const orphanReplies = visibleSlack.filter(m =>
+                m.is_reply && (!m.parent_link || !parents.some(p => msgPermalink(p) === m.parent_link))
+              );
+
+              const byCategory = new Map<string, SlackMessage[]>();
+              for (const p of [...parents, ...orphanReplies]) {
+                const cat = p.category || '분류 없음';
+                if (!byCategory.has(cat)) byCategory.set(cat, []);
+                byCategory.get(cat)!.push(p);
+              }
+              const categoryOrder = ['원고/PSD', '일정/스케줄', '메타/작가', '라이센스/계약', '현지화/번역', 'BM/타입변경', '런칭/오픈', '기타', '분류 없음'];
+              const sortedCategories = [...byCategory.keys()].sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
+
+              const renderMessage = (m: SlackMessage, isReply = false) => {
+                const sender = m.sender ?? '?';
+                const replies = repliesByParent.get(msgPermalink(m)) ?? [];
+                const threadOpen = expandedThreads.has(String(m.id));
+                return (
+                  <div key={m.id} className={`${isReply ? 'pl-10 mt-4 border-l-2 border-gray-100 ml-5' : ''}`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold ${senderColor(sender)}`}>
+                        {senderInitial(sender)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5 gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">{sender}</span>
+                            <span className="text-xs text-gray-400">{msgTime(m)}</span>
+                            {!isReply && (
+                              <StarButton active={isFav('slack', String(m.id))} onClick={() => toggleFav('slack', String(m.id))} />
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-400">{msgDate(m)}</span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{highlightText(msgContent(m), highlightTerms)}</p>
+                        {msgChannel(m) && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Shared in the <span className="text-indigo-500 font-medium">#{msgChannel(m)}</span> channel.
+                          </p>
+                        )}
+                        {(() => {
+                          const images = msgImages(m);
+                          if (images.length === 0) return null;
+                          const key = String(m.id);
+                          const isExpanded = expandedImages.has(key);
+                          if (!isExpanded) {
+                            return (
+                              <button
+                                onClick={() => setExpandedImages(prev => new Set(prev).add(key))}
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors"
+                              >
+                                📷 이미지 {images.length}장 — 클릭하여 보기
+                              </button>
+                            );
+                          }
+                          return (
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {images.map((url, i) => (
+                                <button key={i} onClick={() => setModalImage(url)} className="block">
+                                  <img src={url} alt="" loading="lazy" className="h-20 rounded-lg border border-gray-100 object-cover hover:opacity-90 cursor-zoom-in" />
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => setExpandedImages(prev => { const next = new Set(prev); next.delete(key); return next; })}
+                                className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+                              >접기</button>
+                            </div>
+                          );
+                        })()}
+                        {!isReply && replies.length > 0 && (
+                          <button
+                            onClick={() => {
+                              setExpandedThreads(prev => {
+                                const next = new Set(prev);
+                                if (next.has(String(m.id))) next.delete(String(m.id));
+                                else next.add(String(m.id));
+                                return next;
+                              });
+                            }}
+                            className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                          >
+                            <span>↳ {replies.length} replies</span>
+                            <span className="text-gray-400">{threadOpen ? '· Hide thread' : '· View thread'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {!isReply && threadOpen && replies.map(r => renderMessage(r, true))}
+                  </div>
+                );
+              };
+
+              if (slackMessages.length === 0) {
+                return <div className="text-center text-sm text-gray-400 py-8">Slack 메시지 없음</div>;
+              }
+
+              return (
+                <div>
+                  {/* Slack 헤더 */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg leading-none">
+                          <svg width="18" height="18" viewBox="0 0 127 127" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block">
+                            <path d="M27.2 80c0 7.3-5.9 13.2-13.2 13.2C6.7 93.2.8 87.3.8 80c0-7.3 5.9-13.2 13.2-13.2H27.2V80z" fill="#E01E5A"/>
+                            <path d="M33.7 80c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2v33c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V80z" fill="#E01E5A"/>
+                            <path d="M46.9 27.2c-7.3 0-13.2-5.9-13.2-13.2C33.7 6.7 39.6.8 46.9.8c7.3 0 13.2 5.9 13.2 13.2V27.2H46.9z" fill="#36C5F0"/>
+                            <path d="M46.9 33.7c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H13.9C6.6 60.1.7 54.2.7 46.9c0-7.3 5.9-13.2 13.2-13.2H46.9z" fill="#36C5F0"/>
+                            <path d="M99.8 46.9c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H99.8V46.9z" fill="#2EB67D"/>
+                            <path d="M93.3 46.9c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V13.9C66.9 6.6 72.8.7 80.1.7c7.3 0 13.2 5.9 13.2 13.2V46.9z" fill="#2EB67D"/>
+                            <path d="M80.1 99.8c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V99.8H80.1z" fill="#ECB22E"/>
+                            <path d="M80.1 93.3c-7.3 0-13.2-5.9-13.2-13.2 0-7.3 5.9-13.2 13.2-13.2H113c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H80.1z" fill="#ECB22E"/>
+                          </svg>
+                        </span>
+                        <span className="text-base font-semibold text-gray-900">Slack Message</span>
+                        <span className="text-xs text-gray-400">
+                          {queryActive ? `(${visibleSlack.length}/${slackMessages.length})` : `(${slackMessages.length})`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">관련 Slack 채널의 메시지를 카테고리별로 그룹화합니다.</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-gray-500">Order by:</span>
+                      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                        <button onClick={() => setSlackOrder('category')}
+                          className={`px-3 py-1.5 text-xs font-medium transition-colors ${slackOrder === 'category' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                          Category Order
+                        </button>
+                        <button onClick={() => setSlackOrder('time')}
+                          className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${slackOrder === 'time' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                          Time Order
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 검색창 */}
+                  <div className="mb-4">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                      <input
+                        type="text"
+                        value={slackQuery}
+                        onChange={e => setSlackQuery(e.target.value)}
+                        placeholder="메시지 내용·발신자·카테고리 검색..."
+                        className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      />
+                      {queryActive && (
+                        <button onClick={() => setSlackQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none">×</button>
                       )}
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{highlightText(msgContent(m), highlightTerms)}</p>
-                    {(() => {
-                      const images = msgImages(m);
-                      if (images.length === 0) return null;
-                      const key = String(m.id);
-                      const isExpanded = expandedImages.has(key);
-                      if (!isExpanded) {
-                        return (
-                          <button
-                            onClick={() => setExpandedImages(prev => new Set(prev).add(key))}
-                            className="mt-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors"
-                          >
-                            📷 이미지 {images.length}장 — 클릭하여 보기
-                          </button>
-                        );
-                      }
-                      return (
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {images.map((url, i) => (
-                            <button key={i} onClick={() => setModalImage(url)} className="block">
-                              <img
-                                src={url}
-                                alt=""
-                                loading="lazy"
-                                className="h-20 rounded-lg border border-gray-100 object-cover hover:opacity-90 cursor-zoom-in"
-                              />
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setExpandedImages(prev => { const next = new Set(prev); next.delete(key); return next; })}
-                            className="text-xs text-gray-400 hover:text-gray-600 ml-1"
-                          >
-                            접기
-                          </button>
-                        </div>
-                      );
-                    })()}
-                    {!isReply && replies.length > 0 && (
-                      <button
-                        onClick={() => {
-                          setExpandedThreads(prev => {
-                            const next = new Set(prev);
-                            if (next.has(String(m.id))) next.delete(String(m.id));
-                            else next.add(String(m.id));
-                            return next;
-                          });
-                        }}
-                        className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-                      >
-                        <span>↳ {replies.length} replies</span>
-                        <span className="text-gray-400">{threadOpen ? '· Hide thread' : '· View thread'}</span>
-                      </button>
+                    {queryActive && (
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        {visibleSlack.length > 0 ? `"${rawQuery}" — ${visibleSlack.length}개 일치` : `"${rawQuery}" — 일치하는 메시지 없음`}
+                      </p>
                     )}
                   </div>
-                </div>
-                {!isReply && threadOpen && replies.map(r => renderMessage(r, true))}
-              </div>
-            );
-          };
 
-          if (slackMessages.length === 0) {
-            return <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">Slack 메시지 없음</div>;
-          }
-
-          return (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              {/* 헤더: Slack 로고 + 정렬 토글 */}
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-semibold text-gray-900">💬 Slack Messages</span>
-                  <span className="text-xs text-gray-400">
-                    {queryActive ? `(${visibleSlack.length}/${slackMessages.length})` : `(${slackMessages.length})`}
-                  </span>
-                </div>
-                <div className="flex bg-gray-50 rounded-lg p-0.5">
-                  <button onClick={() => setSlackOrder('category')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${slackOrder === 'category' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
-                    Category
-                  </button>
-                  <button onClick={() => setSlackOrder('time')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${slackOrder === 'time' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
-                    Time
-                  </button>
-                </div>
-              </div>
-
-              {/* 검색창 */}
-              <div className="px-5 py-3 border-b border-gray-100">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
-                  <input
-                    type="text"
-                    value={slackQuery}
-                    onChange={e => setSlackQuery(e.target.value)}
-                    placeholder="메시지 내용·발신자·카테고리 검색..."
-                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                  {queryActive && (
-                    <button
-                      onClick={() => setSlackQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none"
-                      aria-label="검색어 지우기"
-                    >
-                      ×
-                    </button>
+                  {queryActive && visibleSlack.length === 0 && (
+                    <div className="py-10 text-center text-sm text-gray-400">검색 결과가 없습니다.</div>
                   )}
-                </div>
-                {queryActive && (
-                  <p className="text-xs text-gray-400 mt-1.5 px-0.5">
-                    {visibleSlack.length > 0
-                      ? `“${rawQuery}” — ${visibleSlack.length}개 메시지 일치`
-                      : `“${rawQuery}” — 일치하는 메시지 없음`}
-                  </p>
-                )}
-              </div>
 
-              {/* 검색 결과 없음 */}
-              {queryActive && visibleSlack.length === 0 && (
-                <div className="px-5 py-10 text-center text-sm text-gray-400">
-                  검색 결과가 없습니다.
-                </div>
-              )}
-
-              {/* 카테고리별 그룹 보기 */}
-              {slackOrder === 'category' && (
-                <div className="divide-y divide-gray-100">
-                  {sortedCategories.map(cat => {
-                    const list = byCategory.get(cat)!;
-                    const color = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS['분류 없음'];
-                    // 검색 중에는 일치하는 메시지가 보이도록 카테고리를 자동으로 펼침
-                    const isOpen = queryActive || expandedCategories.has(cat);
-                    const latestDate = list[0] ? msgDate(list[0]) : '';
-                    return (
-                      <div key={cat}>
-                        <button
-                          onClick={() => {
-                            setExpandedCategories(prev => {
-                              const next = new Set(prev);
-                              if (next.has(cat)) next.delete(cat);
-                              else next.add(cat);
-                              return next;
-                            });
-                          }}
-                          className={`w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className={`text-gray-400 text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
-                            <span className={`w-2 h-2 rounded-full ${color.dot}`} />
-                            <span className={`text-sm font-semibold ${color.text}`}>{cat}</span>
-                            <span className="text-xs text-gray-400">({list.length})</span>
+                  {/* 카테고리별 */}
+                  {slackOrder === 'category' && (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                      {sortedCategories.map(cat => {
+                        const list = byCategory.get(cat)!;
+                        const isOpen = queryActive || expandedCategories.has(cat);
+                        const latestDate = list.at(-1) ? msgDate(list.at(-1)!) : '';
+                        return (
+                          <div key={cat}>
+                            <button
+                              onClick={() => {
+                                setExpandedCategories(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(cat)) next.delete(cat);
+                                  else next.add(cat);
+                                  return next;
+                                });
+                              }}
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className={`text-gray-400 text-base transition-transform inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                                <span className="text-sm font-medium text-gray-800">{cat}</span>
+                                <span className="text-xs text-gray-400">({list.length})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{latestDate}</span>
+                                {isOpen && <span className="text-gray-400 text-base">‹</span>}
+                              </div>
+                            </button>
+                            {isOpen && (
+                              <div className="px-4 py-4 space-y-5 border-t border-gray-100">
+                                {list.map(m => renderMessage(m))}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-xs text-gray-400">{latestDate}</span>
-                        </button>
-                        {isOpen && (
-                          <div className={`${color.bg} px-5 py-4 space-y-5`}>
-                            {list.map(m => renderMessage(m))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 시간순 보기 */}
-              {slackOrder === 'time' && (
-                <div className="px-5 py-4 space-y-5">
-                  {[...parents, ...orphanReplies].map(m => renderMessage(m))}
-                </div>
-              )}
-
-              {/* 하단 Slack 링크 */}
-              <div className="px-5 py-3 border-t border-gray-100 text-center">
-                <a href="https://slack.com" target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1">
-                  📋 View on Slack ↗
-                </a>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* 📝 언어권별 메모 */}
-        {activeSection === 'memos' && (
-          <div className="space-y-3">
-            {/* 추가 폼 */}
-            <div className="bg-white rounded-xl px-5 py-4 shadow-sm">
-              <div className="flex gap-2">
-                <select value={memoLang} onChange={e => setMemoLang(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                  <option value="">언어 선택</option>
-                  {LANG_TABS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-                <input type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addMemo()}
-                  placeholder="메모 내용 입력..."
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                <button onClick={addMemo} disabled={memoSaving}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                  {memoSaving ? '저장 중…' : '+ 추가'}
-                </button>
-              </div>
-              {memoError && <p className="text-xs text-red-500 mt-2">오류: {memoError}</p>}
-            </div>
-
-            {memos.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">메모 없음</div>}
-
-            {memos.map(m => (
-              <div key={m.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
-                <StarButton active={isFav('memos', m.id)} onClick={() => toggleFav('memos', m.id)} />
-                {m.language && (
-                  <span className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center mt-0.5">{m.language}</span>
-                )}
-                <div className="flex-1">
-                  {editingId === m.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editingText}
-                        onChange={e => setEditingText(e.target.value)}
-                        rows={3}
-                        className="w-full px-3 py-2 rounded-lg border border-indigo-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-                      />
-                      <div className="flex gap-2">
-                        <button onClick={() => saveMemo(m.id)}
-                          className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">저장</button>
-                        <button onClick={() => setEditingId(null)}
-                          className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200">취소</button>
-                      </div>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-800">{m.memo_content}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-xs text-gray-400">{m.created_at?.slice(0, 10)}</span>
-                        <button onClick={() => { setEditingId(m.id); setEditingText(m.memo_content); }}
-                          className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">수정</button>
-                        <button onClick={() => deleteMemo(m.id)}
-                          className="text-xs text-gray-400 hover:text-red-500 transition-colors">삭제</button>
-                      </div>
-                    </>
                   )}
+
+                  {/* 시간순 */}
+                  {slackOrder === 'time' && (
+                    <div className="space-y-5">
+                      {[...parents, ...orphanReplies].map(m => renderMessage(m))}
+                    </div>
+                  )}
+
+                  <div className="mt-4 text-center">
+                    <a href="https://slack.com" target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-gray-400 hover:text-indigo-600 inline-flex items-center gap-1">
+                      View on Slack ↗
+                    </a>
+                  </div>
                 </div>
+              );
+            })()}
+
+            {/* 메모 */}
+            {activeSection === 'memos' && (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <select value={memoLang} onChange={e => setMemoLang(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="">언어 선택</option>
+                    {LANG_TABS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                  <input type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addMemo()}
+                    placeholder="메모 내용 입력..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <button onClick={addMemo} disabled={memoSaving}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                    {memoSaving ? '저장 중…' : '+ 추가'}
+                  </button>
+                </div>
+                {memoError && <p className="text-xs text-red-500">오류: {memoError}</p>}
+                {memos.length === 0 && <div className="text-center text-sm text-gray-400 py-8">메모 없음</div>}
+                {memos.map(m => (
+                  <div key={m.id} className="border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                    <StarButton active={isFav('memos', m.id)} onClick={() => toggleFav('memos', m.id)} />
+                    {m.language && (
+                      <span className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center mt-0.5">{m.language}</span>
+                    )}
+                    <div className="flex-1">
+                      {editingId === m.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingText}
+                            onChange={e => setEditingText(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 rounded-lg border border-indigo-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => saveMemo(m.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">저장</button>
+                            <button onClick={() => setEditingId(null)} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200">취소</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-800">{m.memo_content}</p>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-xs text-gray-400">{m.created_at?.slice(0, 10)}</span>
+                            <button onClick={() => { setEditingId(m.id); setEditingText(m.memo_content); }} className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">수정</button>
+                            <button onClick={() => deleteMemo(m.id)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">삭제</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
           </div>
-        )}
+        </div>
       </div>
 
       {/* 이미지 확대 모달 */}
       {modalImage && (
-        <div
-          onClick={() => setModalImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
-        >
+        <div onClick={() => setModalImage(null)} className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out">
           <img src={modalImage} alt="" className="max-w-full max-h-full rounded-lg" />
-          <button
-            onClick={() => setModalImage(null)}
-            className="absolute top-4 right-4 text-white text-3xl hover:opacity-75"
-            aria-label="닫기"
-          >
-            ×
-          </button>
+          <button onClick={() => setModalImage(null)} className="absolute top-4 right-4 text-white text-3xl hover:opacity-75">×</button>
         </div>
       )}
     </div>
