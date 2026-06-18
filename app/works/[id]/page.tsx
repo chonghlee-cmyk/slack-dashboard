@@ -378,38 +378,51 @@ export default function WorkDetailPage() {
         </div>
 
         {/* ── 언어권 카드 (풀 너비) ── */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-3 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">언어권</p>
-          </div>
-          <div className="grid grid-cols-9">
-            {LANG_TABS.map((lang, idx) => {
-              const lobj = languages.find(l => l.language === lang);
-              const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
-              const br = idx < 8 ? 'border-r border-gray-100' : '';
-              return hasData ? (
-                <div key={lang} className={`px-4 py-3 ${br}`}>
-                  <div className="text-xs font-bold text-gray-800 mb-1.5">{lang}</div>
-                  <div className="space-y-1">
-                    <div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusColor(lobj.serial_status)}`}>
-                        {lobj.serial_status ?? '-'}
-                      </span>
+        {(() => {
+          const activeCount = languages.filter(l => LANG_TABS.includes(l.language) && l.serial_status && l.serial_status !== '-').length;
+          const inactiveCount = LANG_TABS.length - activeCount;
+          return (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-700">언어권 유통 현황</span>
+                <span className="text-xs text-gray-400">{LANG_TABS.length}개 언어권{activeCount > 0 && ` · 연재 가능 ${activeCount}`}{inactiveCount > 0 && ` · 불가 ${inactiveCount}`}</span>
+              </div>
+              <div className="grid grid-cols-9 gap-2 p-3">
+                {LANG_TABS.map(lang => {
+                  const lobj = languages.find(l => l.language === lang);
+                  const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
+                  return (
+                    <div key={lang} className="border border-gray-200 rounded-lg p-3">
+                      <div className="text-sm font-bold text-gray-800 mb-2">{lang}</div>
+                      {hasData ? (
+                        <div className="space-y-1.5">
+                          <div>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusColor(lobj.serial_status)}`}>
+                              {lobj.serial_status ?? '-'}
+                            </span>
+                          </div>
+                          {[
+                            { label: '계약 구분', value: lobj.contract_type },
+                            { label: '스토어 여부', value: lobj.store },
+                            { label: '일반 코인', value: lobj.coin_regular },
+                            { label: '할인 코인', value: lobj.coin_discount },
+                          ].map(({ label, value }) => value && value !== '-' && (
+                            <div key={label} className="flex justify-between items-baseline gap-1">
+                              <span className="text-xs text-gray-400 shrink-0">{label}</span>
+                              <span className="text-xs font-medium text-gray-700 text-right">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-300">유통 정보 없음</p>
+                      )}
                     </div>
-                    {[lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].filter(v => v && v !== '-').map((v, i) => (
-                      <div key={i} className="text-xs text-gray-500">{v}</div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div key={lang} className={`px-4 py-3 opacity-30 ${br}`}>
-                  <div className="text-xs font-bold text-gray-400">{lang}</div>
-                  <div className="text-xs text-gray-300 mt-1">—</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── 섹션 패널 (풀 너비) ── */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
