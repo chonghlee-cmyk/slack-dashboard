@@ -112,10 +112,16 @@ export const LANG_MAP: { tab: string; data: string; status: string }[] = [
 export interface ManuscriptRequest {
   id: number;
   work_number: string | null;
+  error_type: string | null;
   language: string | null;
-  status: string | null;
-  urgency: string | null;
   episode: string | null;
+  file_name: string | null;
+  detail_content: string | null;
+  confirmation_content: string | null;
+  request_language_team: string | null;
+  author: string | null;
+  registration_date: string | null;
+  status: string | null;
   manager: string | null;
   image_url: string | null;
   created_at: string;
