@@ -376,8 +376,16 @@ export default function HomePage() {
                     <td className="px-3 py-3 align-top">
                       <div className="flex items-start gap-1">
                         <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</div>
-                          {work.title_en && <div className="text-[11px] text-gray-400 italic mt-0.5 leading-tight truncate">{work.title_en}</div>}
+                          <div className="flex items-center gap-0.5">
+                            <span className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors leading-tight break-keep">{work.title_ko}</span>
+                            <CopyBtn text={work.title_ko} />
+                          </div>
+                          {work.title_en && (
+                            <div className="flex items-center gap-0.5 mt-0.5">
+                              <span className="text-[11px] text-gray-400 italic leading-tight truncate">{work.title_en}</span>
+                              <CopyBtn text={work.title_en} />
+                            </div>
+                          )}
                         </div>
                         <MemoTip memo={mr?.title_ko_memo} />
                       </div>
@@ -391,13 +399,25 @@ export default function HomePage() {
                       <span className="inline-flex items-center gap-1">{work.platform_name ?? '—'}<MemoTip memo={mr?.platform_memo} /></span>
                     </td>
                     <td className="px-3 py-3 text-gray-600 align-top text-[12px]">
-                      <span className="inline-flex items-center gap-1 truncate">{work.writer_ko ?? '—'}<MemoTip memo={mr?.writer_memo} /></span>
+                      <div className="flex items-center gap-1">
+                        <span className="truncate">{work.writer_ko ?? '—'}</span>
+                        <MemoTip memo={mr?.writer_memo} />
+                        {work.writer_ko && <CopyBtn text={work.writer_ko} />}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-gray-600 align-top text-[12px]">
-                      <span className="inline-flex items-center gap-1 truncate">{work.artist_ko ?? '—'}<MemoTip memo={mr?.artist_memo} /></span>
+                      <div className="flex items-center gap-1">
+                        <span className="truncate">{work.artist_ko ?? '—'}</span>
+                        <MemoTip memo={mr?.artist_memo} />
+                        {work.artist_ko && <CopyBtn text={work.artist_ko} />}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-gray-500 align-top text-[11px] leading-snug">
-                      <span className="inline-flex items-center gap-1 truncate">{work.copyright ?? '—'}<MemoTip memo={mr?.copyright_memo} /></span>
+                      <div className="flex items-center gap-1">
+                        <span className="truncate">{work.copyright ?? '—'}</span>
+                        <MemoTip memo={mr?.copyright_memo} />
+                        {work.copyright && <CopyBtn text={work.copyright} />}
+                      </div>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-nowrap gap-1">
@@ -458,6 +478,33 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 
 function Divider() {
   return <span className="h-4 w-px bg-gray-200 mx-1.5" />;
+}
+
+/* ── 클립보드 복사 버튼 ── */
+function CopyBtn({ text }: { text: string | null | undefined }) {
+  const [copied, setCopied] = useState(false);
+  if (!text) return null;
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button onClick={handleClick} title="복사"
+      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-100">
+      {copied ? (
+        <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      )}
+    </button>
+  );
 }
 
 /* ── 셀 메모 dot + 클릭 팝오버 (fixed 포지셔닝 — overflow 클리핑 방지) ── */
