@@ -169,6 +169,10 @@ export default function WorkDetailPage() {
   const [slackOrder, setSlackOrder] = useState<'category' | 'time'>('category');
   const [slackQuery, setSlackQuery] = useState('');  // Slack 메시지 검색어
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedErrorTypes, setExpandedErrorTypes] = useState<Set<string>>(new Set());
+  const [revisionQuery, setRevisionQuery] = useState('');
+  const [revisionStatusFilter, setRevisionStatusFilter] = useState('');
+  const [revisionLangFilter, setRevisionLangFilter] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());  // 클릭해서 펼친 이미지 (egress 절약)
   const [modalImage, setModalImage] = useState<string | null>(null);              // 확대 보기 모달
@@ -534,79 +538,126 @@ export default function WorkDetailPage() {
 
             {/* 원고 수정사항 */}
             {activeSection === 'revisions' && (() => {
-              if (revisions.length === 0) return <div className="text-center text-sm text-gray-400 py-8">수정사항 없음</div>;
+              const rq = revisionQuery.trim().toLowerCase();
+              const filtered = revisions.filter(r => {
+                if (rq && ![r.detail_content, r.confirmation_content, r.file_name, r.author, r.manager, r.error_type].some(v => v?.toLowerCase().includes(rq))) return false;
+                if (revisionStatusFilter && r.status !== revisionStatusFilter) return false;
+                if (revisionLangFilter && r.language !== revisionLangFilter) return false;
+                return true;
+              });
+              const statuses = [...new Set(revisions.map(r => r.status).filter(Boolean))] as string[];
+              const langs = [...new Set(revisions.map(r => r.language).filter(Boolean))] as string[];
               const byErrorType = new Map<string, ManuscriptRequest[]>();
-              for (const r of revisions) {
+              for (const r of filtered) {
                 const key = r.error_type || '분류 없음';
                 if (!byErrorType.has(key)) byErrorType.set(key, []);
                 byErrorType.get(key)!.push(r);
               }
               return (
-                <div className="space-y-5">
-                  {[...byErrorType.entries()].map(([errorType, items]) => {
-                    const c = ERROR_TYPE_COLORS[errorType] ?? ERROR_TYPE_COLORS['분류 없음'];
-                    return (
-                      <div key={errorType}>
-                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-2 ${c.bg}`}>
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
-                          <span className={`text-sm font-semibold ${c.text}`}>{errorType}</span>
-                          <span className="text-xs text-gray-400 ml-1">{items.length}건</span>
-                        </div>
-                        <div className="space-y-2 pl-1">
-                          {items.map(r => (
-                            <div key={r.id} className="border border-gray-200 rounded-lg px-4 py-3">
-                              {/* 상태·언어·회차·파일명 */}
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                {r.status && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status}</span>}
-                                {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{r.language}</span>}
-                                {r.episode && <span className="text-xs text-gray-600 font-medium">{r.episode}화</span>}
-                                {r.file_name && <span className="text-xs text-gray-400 font-mono bg-gray-50 px-1.5 py-0.5 rounded">{r.file_name}</span>}
-                                <span className="ml-auto text-xs text-gray-400">{r.registration_date ?? r.created_at?.slice(0, 10)}</span>
-                              </div>
-                              {/* 작성자·담당·요청팀 */}
-                              {(r.author || r.manager || r.request_language_team) && (
-                                <div className="flex items-center gap-4 text-xs text-gray-400 mb-2">
-                                  {r.author && <span>작성: <span className="text-gray-600">{r.author}</span></span>}
-                                  {r.manager && <span>담당: <span className="text-gray-600">{r.manager}</span></span>}
-                                  {r.request_language_team && <span>요청팀: <span className="text-gray-600">{r.request_language_team}</span></span>}
-                                </div>
-                              )}
-                              {/* 상세 내용 */}
-                              {r.detail_content && (
-                                <div className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2 mb-2 whitespace-pre-wrap leading-relaxed">{r.detail_content}</div>
-                              )}
-                              {/* 확인 내용 */}
-                              {r.confirmation_content && (
-                                <div className="text-xs text-gray-600 bg-green-50 border border-green-100 rounded-md px-3 py-2 mb-2 whitespace-pre-wrap leading-relaxed">
-                                  <span className="text-green-600 font-semibold block mb-0.5">확인 내용</span>
-                                  {r.confirmation_content}
-                                </div>
-                              )}
-                              {/* 이미지 버튼 (lazy — egress 절약) */}
-                              {r.image_url && (
-                                <div className="mt-2">
-                                  {expandedImages.has(String(r.id)) ? (
-                                    <img src={r.image_url} alt="원고 이미지" loading="lazy"
-                                      className="max-h-72 rounded-lg border border-gray-100 object-contain bg-gray-50 cursor-zoom-in"
-                                      onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })} />
-                                  ) : (
-                                    <button
-                                      onClick={() => setExpandedImages(s => new Set([...s, String(r.id)]))}
-                                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gray-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
-                                      이미지 보기
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                <div>
+                  {/* 검색 + 필터 */}
+                  <div className="mb-4 space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                      <input type="text" value={revisionQuery} onChange={e => setRevisionQuery(e.target.value)}
+                        placeholder="내용·파일명·작성자 검색..."
+                        className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                      {rq && <button onClick={() => setRevisionQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none">×</button>}
+                    </div>
+                    {(statuses.length > 0 || langs.length > 0) && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {statuses.map(s => (
+                          <button key={s} onClick={() => setRevisionStatusFilter(revisionStatusFilter === s ? '' : s)}
+                            className={`px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${revisionStatusFilter === s ? 'bg-[#1a1a2e] border-[#1a1a2e] text-white' : `${revisionStatusColor(s)} border-current`}`}>
+                            {s}
+                          </button>
+                        ))}
+                        {statuses.length > 0 && langs.length > 0 && <span className="h-4 w-px bg-gray-200" />}
+                        {langs.map(l => (
+                          <button key={l} onClick={() => setRevisionLangFilter(revisionLangFilter === l ? '' : l)}
+                            className={`px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${revisionLangFilter === l ? 'bg-[#1a1a2e] border-[#1a1a2e] text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                            {l}
+                          </button>
+                        ))}
+                        {(revisionStatusFilter || revisionLangFilter) && (
+                          <button onClick={() => { setRevisionStatusFilter(''); setRevisionLangFilter(''); }} className="text-[12px] text-gray-400 hover:text-gray-600 underline">초기화</button>
+                        )}
                       </div>
-                    );
-                  })}
+                    )}
+                    {(rq || revisionStatusFilter || revisionLangFilter) && (
+                      <p className="text-xs text-gray-400">{filtered.length > 0 ? `${filtered.length}건 일치` : '일치하는 항목 없음'}</p>
+                    )}
+                  </div>
+
+                  {filtered.length === 0 && <div className="text-center text-sm text-gray-400 py-8">수정사항 없음</div>}
+
+                  {/* error_type별 접이식 그룹 */}
+                  {filtered.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                      {[...byErrorType.entries()].map(([errorType, items]) => {
+                        const isOpen = rq.length > 0 || revisionStatusFilter !== '' || revisionLangFilter !== '' || expandedErrorTypes.has(errorType);
+                        const latestDate = items[0]?.registration_date ?? items[0]?.created_at?.slice(0, 10) ?? '';
+                        return (
+                          <div key={errorType}>
+                            <button
+                              onClick={() => setExpandedErrorTypes(prev => { const n = new Set(prev); if (n.has(errorType)) n.delete(errorType); else n.add(errorType); return n; })}
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-gray-400 text-base transition-transform inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                                <span className="text-sm font-medium text-gray-800">{errorType}</span>
+                                <span className="text-xs text-gray-400">({items.length})</span>
+                              </div>
+                              <span className="text-xs text-gray-400">{latestDate}</span>
+                            </button>
+                            {isOpen && (
+                              <div className="divide-y divide-gray-50 border-t border-gray-100">
+                                {items.map(r => (
+                                  <div key={r.id} className="px-4 py-3 hover:bg-gray-50/60 transition-colors">
+                                    <div className="flex items-center justify-between mb-0.5 gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {r.status && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status}</span>}
+                                        {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{r.language}</span>}
+                                        {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
+                                        {r.file_name && <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">{r.file_name}</span>}
+                                        {r.author && <span className="text-xs font-semibold text-gray-700">{r.author}</span>}
+                                        {r.manager && <span className="text-xs text-gray-400">담당: <span className="text-gray-600">{r.manager}</span></span>}
+                                        {r.request_language_team && <span className="text-xs text-gray-400">요청팀: <span className="text-gray-600">{r.request_language_team}</span></span>}
+                                      </div>
+                                      <span className="text-xs text-gray-400 shrink-0">{r.registration_date ?? r.created_at?.slice(0, 10)}</span>
+                                    </div>
+                                    {r.detail_content && <p className="text-sm text-gray-800 whitespace-pre-wrap break-words mt-1">{r.detail_content}</p>}
+                                    {r.image_url && (
+                                      <div className="mt-2">
+                                        {expandedImages.has(String(r.id)) ? (
+                                          <div>
+                                            <img src={r.image_url} alt="원고 이미지" loading="lazy"
+                                              className="max-h-72 rounded-lg border border-gray-100 object-contain bg-gray-50 cursor-zoom-in"
+                                              onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })} />
+                                            <button onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })} className="text-xs text-gray-400 hover:text-gray-600 mt-1">접기</button>
+                                          </div>
+                                        ) : (
+                                          <button onClick={() => setExpandedImages(s => new Set([...s, String(r.id)]))}
+                                            className="mt-1 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors">
+                                            📷 이미지 보기
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                    {r.confirmation_content && (
+                                      <div className="pl-4 mt-3 border-l-2 border-green-200 ml-1">
+                                        <span className="text-xs font-semibold text-green-600 block mb-0.5">확인 내용</span>
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{r.confirmation_content}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })()}
