@@ -552,53 +552,56 @@ export default function WorkDetailPage() {
                           <span className={`text-sm font-semibold ${c.text}`}>{errorType}</span>
                           <span className="text-xs text-gray-400 ml-1">{items.length}건</span>
                         </div>
-                        <div className="space-y-2 pl-1">
+                        <div className="divide-y divide-gray-50">
                           {items.map(r => (
-                            <div key={r.id} className="border border-gray-200 rounded-lg px-4 py-3">
-                              {/* 상태·언어·회차·파일명 */}
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                {r.status && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status}</span>}
-                                {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{r.language}</span>}
-                                {r.episode && <span className="text-xs text-gray-600 font-medium">{r.episode}화</span>}
-                                {r.file_name && <span className="text-xs text-gray-400 font-mono bg-gray-50 px-1.5 py-0.5 rounded">{r.file_name}</span>}
-                                <span className="ml-auto text-xs text-gray-400">{r.registration_date ?? r.created_at?.slice(0, 10)}</span>
+                            <div key={r.id} className="py-3 px-1 hover:bg-gray-50/60 transition-colors rounded-lg">
+                              {/* 이름 + 배지 + 날짜 */}
+                              <div className="flex items-center justify-between mb-0.5 gap-2 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-semibold text-gray-900">{r.author ?? '—'}</span>
+                                  {r.status && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(r.status)}`}>{r.status}</span>}
+                                  {r.language && <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{r.language}</span>}
+                                  {r.episode && <span className="text-xs text-gray-500">{r.episode}화</span>}
+                                  {r.file_name && <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">{r.file_name}</span>}
+                                </div>
+                                <span className="text-xs text-gray-400 shrink-0">{r.registration_date ?? r.created_at?.slice(0, 10)}</span>
                               </div>
-                              {/* 작성자·담당·요청팀 */}
-                              {(r.author || r.manager || r.request_language_team) && (
-                                <div className="flex items-center gap-4 text-xs text-gray-400 mb-2">
-                                  {r.author && <span>작성: <span className="text-gray-600">{r.author}</span></span>}
+                              {/* 담당·요청팀 */}
+                              {(r.manager || r.request_language_team) && (
+                                <div className="flex items-center gap-3 text-xs text-gray-400 mb-1">
                                   {r.manager && <span>담당: <span className="text-gray-600">{r.manager}</span></span>}
                                   {r.request_language_team && <span>요청팀: <span className="text-gray-600">{r.request_language_team}</span></span>}
                                 </div>
                               )}
                               {/* 상세 내용 */}
                               {r.detail_content && (
-                                <div className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2 mb-2 whitespace-pre-wrap leading-relaxed">{r.detail_content}</div>
-                              )}
-                              {/* 확인 내용 */}
-                              {r.confirmation_content && (
-                                <div className="text-xs text-gray-600 bg-green-50 border border-green-100 rounded-md px-3 py-2 mb-2 whitespace-pre-wrap leading-relaxed">
-                                  <span className="text-green-600 font-semibold block mb-0.5">확인 내용</span>
-                                  {r.confirmation_content}
-                                </div>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap break-words mt-1">{r.detail_content}</p>
                               )}
                               {/* 이미지 버튼 (lazy — egress 절약) */}
                               {r.image_url && (
                                 <div className="mt-2">
                                   {expandedImages.has(String(r.id)) ? (
-                                    <img src={r.image_url} alt="원고 이미지" loading="lazy"
-                                      className="max-h-72 rounded-lg border border-gray-100 object-contain bg-gray-50 cursor-zoom-in"
-                                      onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })} />
+                                    <div>
+                                      <img src={r.image_url} alt="원고 이미지" loading="lazy"
+                                        className="max-h-72 rounded-lg border border-gray-100 object-contain bg-gray-50 cursor-zoom-in"
+                                        onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })} />
+                                      <button onClick={() => setExpandedImages(s => { const n = new Set(s); n.delete(String(r.id)); return n; })}
+                                        className="text-xs text-gray-400 hover:text-gray-600 mt-1">접기</button>
+                                    </div>
                                   ) : (
                                     <button
                                       onClick={() => setExpandedImages(s => new Set([...s, String(r.id)]))}
-                                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gray-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
-                                      이미지 보기
+                                      className="mt-1 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors">
+                                      📷 이미지 보기
                                     </button>
                                   )}
+                                </div>
+                              )}
+                              {/* 확인 내용 — thread reply 스타일 */}
+                              {r.confirmation_content && (
+                                <div className="pl-4 mt-3 border-l-2 border-green-200 ml-1">
+                                  <span className="text-xs font-semibold text-green-600 block mb-0.5">확인 내용</span>
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{r.confirmation_content}</p>
                                 </div>
                               )}
                             </div>
