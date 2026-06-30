@@ -191,6 +191,7 @@ export default function WorkDetailPage() {
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());  // 클릭해서 펼친 이미지 (egress 절약)
   const [modalImage, setModalImage] = useState<string | null>(null);              // 확대 보기 모달
+  const [uncSort, setUncSort] = useState<'episode_asc' | 'episode_desc' | 'psd_asc' | 'psd_desc' | 'date_desc'>('episode_asc');
 
   const [work, setWork] = useState<Work | null>(null);
   const [languages, setLanguages] = useState<WorkLanguage[]>([]);
@@ -938,10 +939,46 @@ export default function WorkDetailPage() {
             })()}
 
             {/* 🔓 무검열 수정사항 */}
-            {activeSection === 'uncensored' && (
+            {activeSection === 'uncensored' && (() => {
+              // 정렬
+              const numOrNull = (s: string | null) => {
+                if (!s) return null;
+                const m = s.match(/-?\d+(\.\d+)?/);
+                return m ? parseFloat(m[0]) : null;
+              };
+              const cmpNum = (a: number | null, b: number | null, asc: boolean) => {
+                if (a === null && b === null) return 0;
+                if (a === null) return 1;
+                if (b === null) return -1;
+                return asc ? a - b : b - a;
+              };
+              const sorted = [...uncensored].sort((a, b) => {
+                if (uncSort === 'episode_asc') return cmpNum(numOrNull(a.episode), numOrNull(b.episode), true) || cmpNum(numOrNull(a.psd), numOrNull(b.psd), true);
+                if (uncSort === 'episode_desc') return cmpNum(numOrNull(a.episode), numOrNull(b.episode), false) || cmpNum(numOrNull(a.psd), numOrNull(b.psd), false);
+                if (uncSort === 'psd_asc') return cmpNum(numOrNull(a.psd), numOrNull(b.psd), true) || cmpNum(numOrNull(a.episode), numOrNull(b.episode), true);
+                if (uncSort === 'psd_desc') return cmpNum(numOrNull(a.psd), numOrNull(b.psd), false) || cmpNum(numOrNull(a.episode), numOrNull(b.episode), false);
+                return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+              });
+              return (
               <div className="space-y-2">
+                {uncensored.length > 0 && (
+                  <div className="flex items-center justify-between bg-white rounded-xl px-4 py-2 shadow-sm">
+                    <span className="text-xs text-gray-500">정렬</span>
+                    <select
+                      value={uncSort}
+                      onChange={e => setUncSort(e.target.value as any)}
+                      className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                      <option value="episode_asc">회차 오름차순</option>
+                      <option value="episode_desc">회차 내림차순</option>
+                      <option value="psd_asc">PSD 오름차순</option>
+                      <option value="psd_desc">PSD 내림차순</option>
+                      <option value="date_desc">최신순</option>
+                    </select>
+                  </div>
+                )}
                 {uncensored.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">무검열 수정사항 없음</div>}
-                {uncensored.map(u => {
+                {uncensored.length > 0 && sorted.map(u => {
                   const imgKey = `unc_${u.id}`;
                   const isExpanded = expandedImages.has(imgKey);
                   return (
@@ -990,7 +1027,8 @@ export default function WorkDetailPage() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
 
             {/* 메모 */}
             {activeSection === 'memos' && (
