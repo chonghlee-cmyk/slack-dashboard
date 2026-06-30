@@ -472,6 +472,7 @@ export default function WorkDetailPage() {
                 {s.key === 'favorites' ? `즐겨찾기 (${favCount})` :
                  s.key === 'revisions' ? `원고 수정사항 (${revisions.length})` :
                  s.key === 'slack' ? `Slack 메시지 (${slackMessages.length})` :
+                 s.key === 'uncensored' ? `무검열 수정사항 (${uncensored.length})` :
                  `메모 (${memos.length})`}
               </button>
             ))}
