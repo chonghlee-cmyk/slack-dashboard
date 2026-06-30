@@ -110,7 +110,22 @@ const revisionStatusColor = (status: string | null) => {
 };
 
 type MemoRow = { id: string; language: string | null; memo_content: string; created_at: string };
-type Section = 'favorites' | 'revisions' | 'slack' | 'memos';
+type Section = 'favorites' | 'revisions' | 'slack' | 'uncensored' | 'memos';
+
+type UncensoredRequest = {
+  id: number;
+  artwork_no: string | null;
+  title_kr: string | null;
+  episode: string | null;
+  psd: string | null;
+  image_url: string | null;
+  description: string | null;
+  status: string | null;
+  request_date: string | null;
+  path: string | null;
+  note: string | null;
+  created_at: string;
+};
 
 function StarButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
@@ -183,6 +198,7 @@ export default function WorkDetailPage() {
   const [langMemo, setLangMemo] = useState<RowMap | null>(null);       // 언어별 셀 메모 (language_memo)
   const [revisions, setRevisions] = useState<ManuscriptRequest[]>([]);
   const [slackMessages, setSlackMessages] = useState<SlackMessage[]>([]);
+  const [uncensored, setUncensored] = useState<UncensoredRequest[]>([]);
   const [memos, setMemos] = useState<MemoRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -223,13 +239,14 @@ export default function WorkDetailPage() {
   async function loadAll() {
     setLoading(true);
     // 새 가로형 테이블들: 작품당 1행 (language_status 는 PK가 '작품번호')
-    const [seriesRes, langDataRes, statusRes, sMemoRes, lMemoRes, revRes] = await Promise.all([
+    const [seriesRes, langDataRes, statusRes, sMemoRes, lMemoRes, revRes, uncRes] = await Promise.all([
       supabase.from('series_data').select('*').eq('id', id).maybeSingle(),
       supabase.from('language_data').select('*').eq('id', id).maybeSingle(),
       supabase.from('language_status').select('*').eq('작품번호', id).maybeSingle(),
       supabase.from('series_memo').select('*').eq('id', id).maybeSingle(),
       supabase.from('language_memo').select('*').eq('id', id).maybeSingle(),
       supabase.from('manuscript_requests').select('*').eq('work_number', id).order('created_at', { ascending: false }).limit(50),
+      supabase.from('uncensored_requests').select('*').eq('artwork_no', id).order('created_at', { ascending: false }).limit(100),
     ]);
 
     // series_data → Work 뷰모델 정규화
@@ -268,6 +285,7 @@ export default function WorkDetailPage() {
     setSeriesMemo((sMemoRes.data ?? null) as RowMap | null);
     setLangMemo((lMemoRes.data ?? null) as RowMap | null);
     setRevisions((revRes.data as ManuscriptRequest[]) ?? []);
+    setUncensored((uncRes.data as UncensoredRequest[]) ?? []);
 
     if (s?.id) {
       const { data: slack } = await supabase
@@ -338,6 +356,7 @@ export default function WorkDetailPage() {
     { key: 'favorites', label: `⭐ 즐겨찾기 (${favCount})` },
     { key: 'revisions', label: `📋 원고 수정사항 (${revisions.length})` },
     { key: 'slack', label: `💬 Slack 메시지 (${slackMessages.length})` },
+    { key: 'uncensored', label: `🔓 무검열 수정사항 (${uncensored.length})` },
     { key: 'memos', label: `📝 언어권별 메모 (${memos.length})` },
   ];
 
@@ -917,6 +936,61 @@ export default function WorkDetailPage() {
                 </div>
               );
             })()}
+
+            {/* 🔓 무검열 수정사항 */}
+            {activeSection === 'uncensored' && (
+              <div className="space-y-2">
+                {uncensored.length === 0 && <div className="text-center text-sm text-gray-400 py-8 bg-white rounded-xl">무검열 수정사항 없음</div>}
+                {uncensored.map(u => {
+                  const imgKey = `unc_${u.id}`;
+                  const isExpanded = expandedImages.has(imgKey);
+                  return (
+                    <div key={u.id} className="bg-white rounded-xl px-5 py-4 shadow-sm flex items-start gap-3">
+                      <StarButton active={isFav('uncensored', String(u.id))} onClick={() => toggleFav('uncensored', String(u.id))} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${revisionStatusColor(u.status)}`}>{u.status ?? '-'}</span>
+                          {u.episode && <span className="text-xs text-gray-500">{u.episode}화</span>}
+                          {u.psd && <span className="text-xs text-gray-500">PSD {u.psd}</span>}
+                          {u.request_date && <span className="text-xs text-gray-400">요청: {u.request_date}</span>}
+                        </div>
+                        {u.description && <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{u.description}</p>}
+                        {u.note && <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">📝 {u.note}</p>}
+                        {u.path && <p className="text-xs text-gray-400 mt-1 font-mono break-all">📁 {u.path}</p>}
+                        {u.image_url && (
+                          !isExpanded ? (
+                            <button
+                              onClick={() => setExpandedImages(prev => new Set(prev).add(imgKey))}
+                              className="mt-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 border border-gray-200 transition-colors"
+                            >
+                              📷 이미지 — 클릭하여 보기
+                            </button>
+                          ) : (
+                            <div className="flex gap-2 mt-2 items-start">
+                              <button onClick={() => setModalImage(u.image_url!)} className="block">
+                                <img
+                                  src={u.image_url}
+                                  alt="무검열 원고"
+                                  loading="lazy"
+                                  className="max-h-64 rounded-lg border border-gray-100 object-contain bg-gray-50 hover:opacity-90 cursor-zoom-in"
+                                />
+                              </button>
+                              <button
+                                onClick={() => setExpandedImages(prev => { const next = new Set(prev); next.delete(imgKey); return next; })}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                접기
+                              </button>
+                            </div>
+                          )
+                        )}
+                        <p className="text-xs text-gray-400 mt-2">{u.created_at?.slice(0, 10)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* 메모 */}
             {activeSection === 'memos' && (
