@@ -457,17 +457,19 @@ export default function WorkDetailPage() {
                   const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
                   return (
                     <div key={lang} className="border border-gray-200 rounded-lg p-3">
-                      <div className="text-sm font-bold text-gray-800 mb-2">{lang}</div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm font-bold text-gray-800">{lang}</span>
+                        {hasData && lobj.serial_status && lobj.serial_status !== '-' && (
+                          <span
+                            title={lobj.serial_status ?? undefined}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border whitespace-nowrap ${langStatusStyle(lobj.serial_status)}`}
+                          >
+                            {langStatusLabel(lobj.serial_status)}
+                          </span>
+                        )}
+                      </div>
                       {hasData ? (
                         <div className="space-y-1.5">
-                          <div>
-                            <span
-                              title={lobj.serial_status ?? undefined}
-                              className={`text-xs px-1.5 py-0.5 rounded-full font-medium border ${langStatusStyle(lobj.serial_status)}`}
-                            >
-                              {langStatusLabel(lobj.serial_status)}
-                            </span>
-                          </div>
                           {[
                             { label: '계약 구분', value: lobj.contract_type },
                             { label: '스토어 여부', value: lobj.store },
