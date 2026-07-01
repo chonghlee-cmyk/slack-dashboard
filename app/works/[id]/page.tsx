@@ -471,16 +471,20 @@ export default function WorkDetailPage() {
                       {hasData ? (
                         <div className="space-y-1.5">
                           {[
-                            { label: '계약 구분', value: lobj.contract_type },
-                            { label: '스토어 여부', value: lobj.store },
-                            { label: '일반 코인', value: lobj.coin_regular },
-                            { label: '할인 코인', value: lobj.coin_discount },
-                          ].map(({ label, value }) => value && value !== '-' && (
-                            <div key={label} className="flex justify-between items-baseline gap-1">
-                              <span className="text-xs text-gray-400 shrink-0">{label}</span>
-                              <span className="text-xs font-medium text-gray-700 text-right">{value}</span>
-                            </div>
-                          ))}
+                            { label: '계약 구분', value: lobj.contract_type, alwaysShow: false },
+                            { label: '스토어 여부', value: lobj.store, alwaysShow: false },
+                            { label: '일반 코인', value: lobj.coin_regular, alwaysShow: false },
+                            { label: '할인 코인', value: lobj.coin_discount, alwaysShow: true },
+                          ].map(({ label, value, alwaysShow }) => {
+                            const has = value && value !== '-';
+                            if (!has && !alwaysShow) return null;
+                            return (
+                              <div key={label} className="flex justify-between items-baseline gap-1">
+                                <span className="text-xs text-gray-400 shrink-0">{label}</span>
+                                <span className={`text-xs text-right ${has ? 'font-medium text-gray-700' : 'text-gray-300'}`}>{has ? value : '-'}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-gray-300">유통 정보 없음</p>
