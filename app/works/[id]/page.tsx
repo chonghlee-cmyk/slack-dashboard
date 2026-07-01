@@ -443,7 +443,19 @@ export default function WorkDetailPage() {
 
         {/* ── 언어권 카드 (풀 너비) ── */}
         {(() => {
-          const activeCount = languages.filter(l => LANG_TABS.includes(l.language) && l.serial_status && l.serial_status !== '-').length;
+          // '연재 가능' 상태: 실제 유통 가능한 상태만 카운트
+          const AVAILABLE_STATUSES = new Set([
+            '연재중',
+            '연재 가능(번역 필요)',
+            '연재 가능(번역 불필요)',
+            '연재준비중',
+            '업커밍',
+          ]);
+          const normalizeStatus = (s: string | null | undefined) =>
+            (s ?? '').trim().replace('비활성회', '비활성화');
+          const activeCount = languages.filter(l =>
+            LANG_TABS.includes(l.language) && AVAILABLE_STATUSES.has(normalizeStatus(l.serial_status))
+          ).length;
           const inactiveCount = LANG_TABS.length - activeCount;
           return (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
