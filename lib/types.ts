@@ -27,7 +27,7 @@ export const LIST_LANGS: { label: string; statusCol: string }[] = [
   { label: 'EN', statusCol: 'en_status' },
   { label: 'ESP', statusCol: 'es_status' },
   { label: 'IT', statusCol: 'it_status' },
-  { label: 'BR', statusCol: 'pt_status' },
+  { label: 'PT', statusCol: 'pt_status' },
   { label: 'DE', statusCol: 'de_status' },
   { label: 'FR', statusCol: 'fr_status' },
   { label: 'TC', statusCol: 'tw_status' },
