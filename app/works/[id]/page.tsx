@@ -451,18 +451,18 @@ export default function WorkDetailPage() {
                 <span className="text-sm font-semibold text-gray-700">언어권 유통 현황</span>
                 <span className="text-xs text-gray-400">{LANG_TABS.length}개 언어권{activeCount > 0 && ` · 연재 가능 ${activeCount}`}{inactiveCount > 0 && ` · 불가 ${inactiveCount}`}</span>
               </div>
-              <div className="grid grid-cols-9 gap-2 p-3">
+              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3 p-4">
                 {LANG_TABS.map(lang => {
                   const lobj = languages.find(l => l.language === lang);
                   const hasData = !!lobj && [lobj.serial_status, lobj.contract_type, lobj.store, lobj.coin_regular, lobj.coin_discount].some(v => v && v !== '-');
                   return (
-                    <div key={lang} className="border border-gray-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-sm font-bold text-gray-800">{lang}</span>
+                    <div key={lang} className="border border-gray-200 rounded-lg p-4 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                        <span className="text-base font-bold text-gray-800">{lang}</span>
                         {hasData && lobj.serial_status && lobj.serial_status !== '-' && (
                           <span
                             title={lobj.serial_status ?? undefined}
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border whitespace-nowrap ${langStatusStyle(lobj.serial_status)}`}
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium border whitespace-nowrap ${langStatusStyle(lobj.serial_status)}`}
                           >
                             {langStatusLabel(lobj.serial_status)}
                           </span>
@@ -471,13 +471,12 @@ export default function WorkDetailPage() {
                       {hasData ? (
                         <div className="space-y-1.5">
                           {[
-                            { label: '계약 구분', value: lobj.contract_type, alwaysShow: false },
-                            { label: '스토어 여부', value: lobj.store, alwaysShow: false },
-                            { label: '일반 코인', value: lobj.coin_regular, alwaysShow: false },
-                            { label: '할인 코인', value: lobj.coin_discount, alwaysShow: true },
-                          ].map(({ label, value, alwaysShow }) => {
+                            { label: '계약 구분', value: lobj.contract_type },
+                            { label: '스토어 여부', value: lobj.store },
+                            { label: '일반 코인', value: lobj.coin_regular },
+                            { label: '할인 코인', value: lobj.coin_discount },
+                          ].map(({ label, value }) => {
                             const has = value && value !== '-';
-                            if (!has && !alwaysShow) return null;
                             return (
                               <div key={label} className="flex justify-between items-baseline gap-1">
                                 <span className="text-xs text-gray-400 shrink-0">{label}</span>
