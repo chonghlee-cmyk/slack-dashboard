@@ -443,14 +443,8 @@ export default function WorkDetailPage() {
 
         {/* ── 언어권 카드 (풀 너비) ── */}
         {(() => {
-          // '연재 가능' 상태: 실제 유통 가능한 상태만 카운트
-          const AVAILABLE_STATUSES = new Set([
-            '연재중',
-            '연재 가능(번역 필요)',
-            '연재 가능(번역 불필요)',
-            '연재준비중',
-            '업커밍',
-          ]);
+          // '연재 가능' 상태: '연재중'만 카운트 (나머지는 모두 불가)
+          const AVAILABLE_STATUSES = new Set(['연재중']);
           const normalizeStatus = (s: string | null | undefined) =>
             (s ?? '').trim().replace('비활성회', '비활성화');
           const activeCount = languages.filter(l =>
