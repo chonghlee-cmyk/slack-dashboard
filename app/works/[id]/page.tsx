@@ -443,19 +443,35 @@ export default function WorkDetailPage() {
 
         {/* ── 언어권 카드 (풀 너비) ── */}
         {(() => {
-          // '연재 가능' 상태: '연재중'만 카운트 (나머지는 모두 불가)
-          const AVAILABLE_STATUSES = new Set(['연재중']);
+          // 각 상태별 카운트 집계
           const normalizeStatus = (s: string | null | undefined) =>
             (s ?? '').trim().replace('비활성회', '비활성화');
-          const activeCount = languages.filter(l =>
-            LANG_TABS.includes(l.language) && AVAILABLE_STATUSES.has(normalizeStatus(l.serial_status))
-          ).length;
-          const inactiveCount = LANG_TABS.length - activeCount;
+          const statusCounts = new Map<string, number>();
+          for (const l of languages) {
+            if (!LANG_TABS.includes(l.language)) continue;
+            const n = normalizeStatus(l.serial_status);
+            if (!n) continue;
+            statusCounts.set(n, (statusCounts.get(n) ?? 0) + 1);
+          }
+          // LANG_STATUS_FILTERS 순서대로, 카운트 > 0 인 것만 표시
+          const orderedCounts = LANG_STATUS_FILTERS
+            .map(f => ({ label: f.label, value: f.value, count: statusCounts.get(f.value) ?? 0 }))
+            .filter(x => x.count > 0);
           return (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3">
-                <span className="text-sm font-semibold text-gray-700">언어권 유통 현황</span>
-                <span className="text-xs text-gray-400">{LANG_TABS.length}개 언어권{activeCount > 0 && ` · 연재 가능 ${activeCount}`}{inactiveCount > 0 && ` · 불가 ${inactiveCount}`}</span>
+              <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-gray-700">언어권 런칭 현황</span>
+                <span className="text-xs text-gray-400">{LANG_TABS.length}개 언어권</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {orderedCounts.map(x => (
+                    <span
+                      key={x.value}
+                      className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium border ${langStatusStyle(x.value)}`}
+                    >
+                      {x.label} {x.count}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3 p-4">
                 {LANG_TABS.map(lang => {
