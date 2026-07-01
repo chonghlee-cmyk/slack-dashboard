@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Work, WorkLanguage, ManuscriptRequest, SlackMessage, SeriesRow, RowMap, LANG_MAP } from '@/lib/types';
+import { Work, WorkLanguage, ManuscriptRequest, SlackMessage, SeriesRow, RowMap, LANG_MAP, LANG_STATUS_FILTERS } from '@/lib/types';
 import { engToKorean, looksLikeEngInput } from '@/lib/koreanInput';
 
 const LANG_TABS = ['PT', 'EN', 'ES', 'IT', 'DE', 'FR', 'TC', 'JP', 'TH'];
@@ -100,6 +100,35 @@ const statusColor = (status: string | null) => {
   if (status.includes('완결') || status.toLowerCase().includes('complete')) return 'bg-green-100 text-green-600';
   return 'bg-gray-100 text-gray-500';
 };
+
+// 언어권 상태 DB 값 → 메인 페이지와 동일한 표시 라벨
+function langStatusLabel(v: string | null | undefined): string {
+  if (!v || v === '-' || v.trim() === '') return '-';
+  const t = v.trim();
+  // 오탈자 자동 교정
+  const normalized = t.replace('비활성회', '비활성화');
+  const found = LANG_STATUS_FILTERS.find(f => f.value === normalized);
+  return found ? found.label : normalized;
+}
+
+// 언어권 상태 배지 색상 (메인 페이지 langStatusStyle과 동일)
+function langStatusStyle(v: string | null | undefined): string {
+  if (!v || v === '-' || v === '') return 'bg-gray-50 text-gray-300 border-gray-200';
+  const s = v.trim().replace('비활성회', '비활성화');
+  if (s === '연재중')            return 'bg-green-50 text-green-800 border-green-300';
+  if (s.includes('번역 필요'))    return 'bg-amber-50 text-amber-800 border-amber-300';
+  if (s.includes('번역 불필요'))  return 'bg-blue-50 text-blue-800 border-blue-300';
+  if (s === '연재준비중')        return 'bg-teal-50 text-teal-800 border-teal-300';
+  if (s === '업커밍')            return 'bg-violet-50 text-violet-800 border-violet-300';
+  if (s === '휴재')              return 'bg-orange-50 text-orange-800 border-orange-300';
+  if (s === '완결')              return 'bg-gray-200 text-gray-700 border-gray-400';
+  if (s === '연재 불가')          return 'bg-red-50 text-red-700 border-red-300';
+  if (s === '연재안함')          return 'bg-pink-50 text-pink-700 border-pink-300';
+  if (s === '비활성화')          return 'bg-gray-100 text-gray-400 border-gray-300';
+  if (s === '확인필요')          return 'bg-yellow-100 text-yellow-800 border-yellow-400';
+  if (s === '계약종료')          return 'bg-gray-700 text-gray-50 border-gray-600';
+  return 'bg-gray-50 text-gray-400 border-gray-200';
+}
 
 const revisionStatusColor = (status: string | null) => {
   if (!status) return 'bg-gray-100 text-gray-600';
@@ -432,8 +461,11 @@ export default function WorkDetailPage() {
                       {hasData ? (
                         <div className="space-y-1.5">
                           <div>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusColor(lobj.serial_status)}`}>
-                              {lobj.serial_status ?? '-'}
+                            <span
+                              title={lobj.serial_status ?? undefined}
+                              className={`text-xs px-1.5 py-0.5 rounded-full font-medium border ${langStatusStyle(lobj.serial_status)}`}
+                            >
+                              {langStatusLabel(lobj.serial_status)}
                             </span>
                           </div>
                           {[
